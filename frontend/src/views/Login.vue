@@ -1,0 +1,152 @@
+<template>
+  <div class="login-container">
+    <el-card class="login-card">
+      <template #header>
+        <h2 class="login-title">国旗护卫队管理系统</h2>
+      </template>
+      <el-form
+        ref="formRef"
+        :model="loginForm"
+        :rules="rules"
+        label-width="80px"
+        @submit.prevent="handleLogin"
+      >
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="loginForm.username" placeholder="请输入用户名" />
+        </el-form-item>
+        <el-form-item label="密码" prop="password">
+          <el-input
+            v-model="loginForm.password"
+            type="password"
+            placeholder="请输入密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" native-type="submit" :loading="loading" block>
+            登录
+          </el-button>
+        </el-form-item>
+        <div class="register-link">
+          <router-link to="/register">没有账号？立即注册</router-link>
+        </div>
+      </el-form>
+    </el-card>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import type { FormInstance } from 'element-plus'
+import { useUserStore } from '../stores/user'
+
+const router = useRouter()
+const userStore = useUserStore()
+const loading = ref(false)
+const formRef = ref<FormInstance>()
+
+const loginForm = reactive({
+  username: '',
+  password: ''
+})
+
+const rules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '长度在 6 到 20 个字符', trigger: 'blur' }
+  ]
+}
+
+const handleLogin = async () => {
+  if (!formRef.value) return
+
+  try {
+    await formRef.value.validate()
+    loading.value = true
+    
+    // 登录
+    await userStore.login(loginForm.username, loginForm.password)
+    
+    // 显示成功消息
+    ElMessage({
+      type: 'success',
+      message: '登录成功',
+      duration: 2000
+    })
+
+    // 等待一下确保token被设置
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // 获取用户信息
+    try {
+      await userStore.getUserInfo()
+      const userInfo = userStore.userInfo
+      if (userInfo) {
+        if (userInfo.role === 'admin' || userInfo.role === 'captain') {
+          router.replace('/dashboard')
+        } else {
+          router.replace('/profile')
+        }
+      } else {
+        router.replace('/')
+      }
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+      ElMessage.error('获取用户信息失败，请重新登录')
+      userStore.logout()
+      return
+    }
+  } catch (error: any) {
+    console.error('登录失败:', error)
+    if (error.response?.data?.msg) {
+      ElMessage.error(error.response.data.msg)
+    } else if (error.message) {
+      ElMessage.error(error.message)
+    } else {
+      ElMessage.error('登录失败，请检查用户名和密码')
+    }
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<style scoped>
+.login-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f5f7fa;
+}
+
+.login-card {
+  width: 400px;
+}
+
+.login-title {
+  text-align: center;
+  margin: 0;
+  color: #409eff;
+}
+
+.register-link {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.register-link a {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.register-link a:hover {
+  text-decoration: underline;
+}
+</style> 
