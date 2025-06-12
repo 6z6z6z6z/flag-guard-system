@@ -20,6 +20,7 @@ class User(db.Model):
     weight = db.Column(db.Integer)
     shoe_size = db.Column(db.Integer)
     total_points = db.Column(db.Float, default=0.0)
+    phone_number = db.Column(db.String(15), nullable=True)
     
     # 关系
     flag_records = db.relationship('FlagRecord', foreign_keys='FlagRecord.user_id', back_populates='user')

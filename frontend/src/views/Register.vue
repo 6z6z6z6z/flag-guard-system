@@ -35,6 +35,9 @@
         <el-form-item label="学院" prop="college">
           <el-input v-model="registerForm.college" placeholder="请输入学院" />
         </el-form-item>
+        <el-form-item label="手机号" prop="phone_number">
+          <el-input v-model="registerForm.phone_number" placeholder="请输入手机号" />
+        </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="registerForm.role">
             <el-option label="管理员" value="admin" />
@@ -72,7 +75,8 @@ const registerForm = reactive({
   name: '',
   student_id: '',
   college: '',
-  role: 'member'
+  role: 'member',
+  phone_number: ''
 })
 
 const rules = {
@@ -93,7 +97,11 @@ const rules = {
     { pattern: /^[A-Z]{2}\d{8}$/, message: '学号格式为2个大写字母+8个数字', trigger: 'blur' }
   ],
   college: [{ required: true, message: '请输入学院', trigger: 'blur' }],
-  role: [{ required: true, message: '请选择角色', trigger: 'change' }]
+  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
+  phone_number: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^\d{11}$/, message: '手机号格式不正确', trigger: 'blur' }
+  ]
 }
 
 const handleRegister = async () => {

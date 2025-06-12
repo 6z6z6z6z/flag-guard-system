@@ -20,6 +20,7 @@
       <el-table-column prop="name" label="姓名" />
       <el-table-column prop="student_id" label="学号" />
       <el-table-column prop="college" label="学院" />
+      <el-table-column prop="phone_number" label="手机号" />
       <el-table-column prop="role" label="角色">
         <template #default="{ row }">
           <el-tag :type="row.role === 'admin' ? 'danger' : 'info'">
@@ -81,8 +82,8 @@
         <el-form-item label="学院" prop="college">
           <el-input v-model="form.college" />
         </el-form-item>
-        <el-form-item label="密码" prop="password" v-if="!form.id">
-          <el-input v-model="form.password" type="password" />
+        <el-form-item label="手机号" prop="phone_number">
+          <el-input v-model="form.phone_number" />
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="form.role" style="width: 100%">
@@ -124,16 +125,17 @@ const form = ref({
   student_id: '',
   college: '',
   role: 'user',
-  points: 0
+  points: 0,
+  phone_number: ''
 })
 
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
   student_id: [{ required: true, message: '请输入学号', trigger: 'blur' }],
   college: [{ required: true, message: '请输入学院', trigger: 'blur' }],
-  role: [{ required: true, message: '请选择角色', trigger: 'change' }]
+  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
+  phone_number: [{ required: true, message: '请输入手机号', trigger: 'blur' }, { pattern: /^\d{11}$/, message: '手机号格式不正确', trigger: 'blur' }]
 }
 
 // 获取用户列表
@@ -187,7 +189,8 @@ const handleCreate = () => {
     student_id: '',
     college: '',
     role: 'user',
-    points: 0
+    points: 0,
+    phone_number: ''
   }
   dialogVisible.value = true
 }

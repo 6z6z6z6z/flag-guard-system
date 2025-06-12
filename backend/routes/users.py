@@ -47,7 +47,8 @@ def get_profile():
             "weight": user.weight,
             "shoe_size": user.shoe_size,
             "total_points": user.total_points,
-            "role": user.role
+            "role": user.role,
+            "phone_number": user.phone_number
         }
         
         current_app.logger.info(f"Successfully retrieved profile for user: {user.username}")
@@ -276,6 +277,7 @@ def get_all_users_points():
                     "student_id": user.student_id,
                     "college": user.college,
                     "total_points": user.total_points,
+                    "phone_number": user.phone_number,
                     "role": user.role
                 } for user in pagination.items],
                 "total": pagination.total,
@@ -341,10 +343,6 @@ def create_user():
         for field in required_fields:
             if not data.get(field):
                 return jsonify({"msg": f"Missing required field: {field}"}), 400
-        
-        # 验证学号格式
-        if not User.validate_student_id(data['student_id']):
-            return jsonify({"msg": "Invalid student ID format. It must be 2 uppercase letters followed by 8 digits."}), 400
                 
         # 检查用户名是否已存在
         if User.query.filter_by(username=data['username']).first():
@@ -360,7 +358,8 @@ def create_user():
             name=data['name'],
             student_id=data['student_id'],
             college=data['college'],
-            role=data.get('role', 'user')
+            role=data.get('role', 'user'),
+            phone_number=data.get('phone_number')
         )
         user.set_password(data['password'])
         

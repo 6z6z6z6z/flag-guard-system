@@ -34,6 +34,9 @@ def register():
               type: string
               enum: [admin, member]
               default: member
+            phone_number:
+              type: string
+              pattern: "^\\d{10,15}$"
     responses:
       201:
         description: 注册成功
@@ -76,7 +79,8 @@ def register():
                 name=data['name'],
                 student_id=data['student_id'],
                 college=data['college'],
-                role=data.get('role', 'member')  # 如果未指定角色，默认为队员
+                role=data.get('role', 'member'),  # 如果未指定角色，默认为队员
+                phone_number=data.get('phone_number')
             )
             if not user.set_password(data['password']):
                 raise Exception("Failed to set password")
@@ -164,6 +168,7 @@ def login():
                         "role": user.role,
                         "college": user.college,
                         "student_id": user.student_id,
+                        "phone_number": user.phone_number,
                         "total_points": user.total_points
                     }
                 }
@@ -205,7 +210,8 @@ def get_profile():
             'name': user.name,
             'role': user.role,
             'college': user.college,
-            'total_points': user.total_points
+            'total_points': user.total_points,
+            'phone_number': user.phone_number
         }), 200
     except Exception as e:
         current_app.logger.error(f"Profile error: {str(e)}")
