@@ -1322,25 +1322,201 @@ _**User**_
 
 _**Assistant**_
 
+<details>
+            <summary>Listed directory backend • **22** results</summary>
+        
+| Name |
+|-------|
+| 📄 `app.py` |
+| 📁 `__pycache__` |
+| 📄 `models.py` |
+| 📄 `requirements.txt` |
+| 📄 `config.py` |
+| 📁 `.specstory` |
+| 📄 `.cursorindexingignore` |
+| 📁 `instance` |
+| 📁 `venv` |
+| 📁 `utils` |
+| 📁 `routes` |
+| 📁 `logs` |
+| 📁 `uploads` |
+| 📄 `test_api.py` |
+| 📁 `migrations` |
+| 📄 `clear_data.py` |
+| 📄 `cli.py` |
+| 📄 `create_tables.py` |
+| 📄 `extensions.py` |
+| 📁 `middleware` |
+| 📄 `README.md` |
+| 📄 `__init__.py` |
 
+</details>
 
 ---
 
+<details>
+            <summary>Listed directory backend/routes • **12** results</summary>
+        
+| Name |
+|-------|
+| 📁 `__pycache__` |
+| 📄 `users.py` |
+| 📄 `auth.py` |
+| 📄 `training.py` |
+| 📄 `trainings.py` |
+| 📄 `records.py` |
+| 📄 `flag.py` |
+| 📄 `points.py` |
+| 📄 `event.py` |
+| 📄 `events.py` |
+| 📄 `file.py` |
+| 📄 `dashboard.py` |
 
+</details>
 
 ---
 
-
-
----
-
-
+Read file: backend/routes/users.py
 
 ---
 
+To ensure that administrators can edit user information, including changing roles, we need to verify and potentially adjust the following:
 
+1. **Ensure the Edit Endpoint Exists**: We need to ensure there is an endpoint that allows editing user details, not just roles. The current setup only allows role updates.
+
+2. **Check Frontend Requests**: Ensure that the frontend is making the correct API requests to the backend for editing user details.
+
+3. **Backend Logic for Editing Users**: Implement or verify the logic that allows updating user details, including name, student ID, college, phone number, and role.
+
+### Steps to Implement:
+
+1. **Add/Edit User Endpoint**: We need to ensure there is an endpoint in `users.py` that allows updating user details. Let's add or verify this functionality.
+
+2. **Update Frontend Logic**: Ensure that the frontend (`Users.vue`) is correctly sending requests to this endpoint.
+
+Let's start by adding an endpoint in `users.py` to handle editing user details.
 
 ---
+
+```diff
+          db.session.rollback()
+          return jsonify({"msg": str(e)}), 500
++ 
++ @users_bp.route('/<int:user_id>', methods=['PUT'])
++ @jwt_required()
++ def update_user(user_id):
++     """
++     更新用户信息
++     ---
++     tags:
++       - 用户
++     security:
++       - Bearer: []
++     parameters:
++       - name: user_id
++         in: path
++         type: integer
++         required: true
++         description: 用户ID
++       - name: body
++         in: body
++         required: true
++         schema:
++           type: object
++           properties:
++             name:
++               type: string
++             student_id:
++               type: string
++             college:
++               type: string
++             phone_number:
++               type: string
++             role:
++               type: string
++               enum: ["admin", "member"]
++     responses:
++       200:
++         description: 更新成功
++       400:
++         description: 参数错误
++       403:
++         description: 权限不足
++       404:
++         description: 用户不存在
++     """
++     try:
++         current_user_id = get_jwt_identity()
++         current_user = User.query.get(current_user_id)
++ 
++         if not current_user or current_user.role != 'admin':
++             return jsonify({"msg": "权限不足"}), 403
++ 
++         user = User.query.get(user_id)
++ 
++         if not user:
++             return jsonify({"msg": "用户不存在"}), 404
++ 
++         data = request.get_json()
++ 
++         # 更新用户信息
++         user.name = data.get('name', user.name)
++         user.student_id = data.get('student_id', user.student_id)
++         user.college = data.get('college', user.college)
++         user.phone_number = data.get('phone_number', user.phone_number)
++         user.role = data.get('role', user.role)
++ 
++         db.session.commit()
++ 
++         return jsonify({"msg": "用户信息更新成功"}), 200
++     except Exception as e:
++         db.session.rollback()
++         return jsonify({"msg": str(e)}), 500 
+```
+
+---
+
+I have added an endpoint in `users.py` to allow administrators to update user details, including name, student ID, college, phone number, and role.
+
+Next, let's ensure that the frontend (`Users.vue`) is correctly sending requests to this new endpoint for editing user details. I'll update the `handleSubmit` function in `Users.vue` to use this endpoint.
+
+---
+
+```diff
+    try {
+      await formRef.value.validate()
+-     const response = await request.put(`/users/${form.value.id}/role`, {
++     const response = await request.put(`/users/${form.value.id}`, {
++       name: form.value.name,
++       student_id: form.value.student_id,
++       college: form.value.college,
++       phone_number: form.value.phone_number,
+        role: form.value.role
+      })
+  
+-     if (response.data?.msg === '角色更新成功') {
+-       ElMessage.success('角色更新成功')
++     if (response.data?.msg === '用户信息更新成功') {
++       ElMessage.success('用户信息更新成功')
+        dialogVisible.value = false
+        fetchUsers()
+```
+
+---
+
+I have updated the `handleSubmit` function in `Users.vue` to send requests to the new endpoint for editing user details. This should now allow administrators to edit user information, including changing roles.
+
+Please test the functionality to ensure everything works as expected. If there are any further issues or additional changes needed, feel free to let me know!
+
+---
+
+_**User**_
+
+可不可以将管理员在用户管理界面的创建用户功能取消，因为作为管理员，不知道用户的手机号，以及人家想要创建的用户名密码等信息，所以，请你帮我删去管理员在用户管理界面的创建用户功能。
+
+---
+
+_**Assistant**_
 
 
 

@@ -9,9 +9,9 @@
           class="search-input"
           @input="handleSearch"
         />
-        <el-button type="primary" @click="handleCreate">
+        <!-- <el-button type="primary" @click="handleCreate">
           创建用户
-        </el-button>
+        </el-button> -->
       </div>
     </div>
 
@@ -178,22 +178,22 @@ const handleCurrentChange = (val: number) => {
   fetchUsers()
 }
 
-// 创建用户
-const handleCreate = () => {
-  dialogTitle.value = '创建用户'
-  form.value = {
-    id: null,
-    username: '',
-    name: '',
-    password: '',
-    student_id: '',
-    college: '',
-    role: 'member',
-    points: 0,
-    phone_number: ''
-  }
-  dialogVisible.value = true
-}
+// // 创建用户
+// const handleCreate = () => {
+//   dialogTitle.value = '创建用户'
+//   form.value = {
+//     id: null,
+//     username: '',
+//     name: '',
+//     password: '',
+//     student_id: '',
+//     college: '',
+//     role: 'member',
+//     points: 0,
+//     phone_number: ''
+//   }
+//   dialogVisible.value = true
+// }
 
 // 编辑用户
 const handleEdit = (row: any) => {
@@ -270,11 +270,6 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
 .search-input {
   width: 300px;
 }
@@ -284,4 +279,4 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
 }
-</style> 
+</style>
