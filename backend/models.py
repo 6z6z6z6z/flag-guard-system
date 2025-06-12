@@ -3,6 +3,7 @@ from extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.ext.hybrid import hybrid_property
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='member')  # 'member', 'admin', 'captain'
     name = db.Column(db.String(50), nullable=False)
-    student_id = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    student_id = db.Column(db.String(10), unique=True, nullable=False, index=True)
     college = db.Column(db.String(100), nullable=False)
     height = db.Column(db.Integer)
     weight = db.Column(db.Integer)
@@ -28,6 +29,11 @@ class User(db.Model):
     point_history = db.relationship('PointHistory', back_populates='user')
     created_trainings = db.relationship('Training', back_populates='creator', foreign_keys='Training.created_by')
     created_events = db.relationship('Event', back_populates='creator', foreign_keys='Event.created_by')
+
+    @staticmethod
+    def validate_student_id(student_id):
+        """验证学号格式是否为2个大写字母+8个数字"""
+        return re.match(r'^[A-Z]{2}\d{8}$', student_id)
 
     def set_password(self, password):
         """设置密码，自动进行哈希处理"""

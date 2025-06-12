@@ -48,6 +48,7 @@
           </el-button>
         </el-form-item>
       </el-form>
+      <el-button v-if="showReturnButton" @click="router.push('/login')" block>返回登录</el-button>
     </el-card>
   </div>
 </template>
@@ -63,6 +64,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
 const formRef = ref<FormInstance>()
+const showReturnButton = ref(false)
 
 const registerForm = reactive({
   username: '',
@@ -88,7 +90,7 @@ const rules = {
   ],
   student_id: [
     { required: true, message: '请输入学号', trigger: 'blur' },
-    { pattern: /^\d+$/, message: '学号必须是数字', trigger: 'blur' }
+    { pattern: /^[A-Z]{2}\d{8}$/, message: '学号格式为2个大写字母+8个数字', trigger: 'blur' }
   ],
   college: [{ required: true, message: '请输入学院', trigger: 'blur' }],
   role: [{ required: true, message: '请选择角色', trigger: 'change' }]
@@ -104,11 +106,11 @@ const handleRegister = async () => {
     if (res.status === 201) {
       ElMessage({
         type: 'success',
-        message: '注册成功，请登录',
+        message: '注册成功',
         duration: 2000
       })
       setTimeout(() => {
-        router.push('/login')
+        showReturnButton.value = true
       }, 1000)
     } else {
       ElMessage.error(res.data?.msg || '注册失败，请重试')

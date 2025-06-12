@@ -341,6 +341,10 @@ def create_user():
         for field in required_fields:
             if not data.get(field):
                 return jsonify({"msg": f"Missing required field: {field}"}), 400
+        
+        # 验证学号格式
+        if not User.validate_student_id(data['student_id']):
+            return jsonify({"msg": "Invalid student ID format. It must be 2 uppercase letters followed by 8 digits."}), 400
                 
         # 检查用户名是否已存在
         if User.query.filter_by(username=data['username']).first():
