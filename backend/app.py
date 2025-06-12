@@ -118,6 +118,32 @@ def create_app(config_class=Config):
         identity = jwt_data["sub"]
         return User.query.filter_by(user_id=identity).one_or_none()
     
+# 初始化数据库并创建默认管理员
+    with app.app_context():
+        db.create_all()
+    
+    # 创建默认管理员用户
+        if not User.query.filter_by(username='admin').first():
+            admin_user = User(
+            username='admin',
+            role='admin',
+            name='管理员',
+            student_id='0000000000',
+            college='学院',
+            height=170,
+            weight=60,
+            shoe_size=42,
+            total_points=0.0,
+            phone_number='00000000000'
+        )
+            admin_user.set_password('admin123') 
+            db.session.add(admin_user)
+            db.session.commit()
+            app.logger.info('Default admin user created.')
+        else:
+            app.logger.info('Default admin user already exists.')
+
+
     # 注册蓝图
     from routes.auth import auth_bp
     from routes.file import file_bp
@@ -212,7 +238,26 @@ def create_app(config_class=Config):
     # 初始化数据库
     with app.app_context():
         db.create_all()
-        
+        if not User.query.filter_by(username='admin').first():
+            admin_user = User(
+            username='admin',
+            role='admin',
+            name='管理员',
+            student_id='0000000000',
+            college='学院',
+            height=170,
+            weight=60,
+            shoe_size=42,
+            total_points=0.0,
+            phone_number='00000000000'
+        )
+            admin_user.set_password('admin123') 
+            db.session.add(admin_user)
+            db.session.commit()
+            app.logger.info('Default admin user created.')
+        else:
+            app.logger.info('Default admin user already exists.')
+
     return app
 
 app = create_app()

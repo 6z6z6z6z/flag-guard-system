@@ -381,4 +381,136 @@ def create_user():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error creating user: {str(e)}")
+        return jsonify({"msg": str(e)}), 500
+
+@users_bp.route('/<int:user_id>/role', methods=['PUT'])
+@jwt_required()
+def update_user_role(user_id):
+    """
+    更新用户角色
+    ---
+    tags:
+      - 用户
+    security:
+      - Bearer: []
+    parameters:
+      - name: user_id
+        in: path
+        type: integer
+        required: true
+        description: 用户ID
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            role:
+              type: string
+              enum: ["admin", "member"]
+    responses:
+      200:
+        description: 更新成功
+      400:
+        description: 参数错误
+      403:
+        description: 权限不足
+      404:
+        description: 用户不存在
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+
+        if not current_user or current_user.role != 'admin':
+            return jsonify({"msg": "权限不足"}), 403
+
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"msg": "用户不存在"}), 404
+
+        data = request.get_json()
+        new_role = data.get('role')
+
+        if new_role not in ['admin', 'member']:
+            return jsonify({"msg": "无效的角色"}), 400
+
+        user.role = new_role
+        db.session.commit()
+
+        return jsonify({"msg": "角色更新成功"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"msg": str(e)}), 500
+
+@users_bp.route('/<int:user_id>', methods=['PUT'])
+@jwt_required()
+def update_user(user_id):
+    """
+    更新用户信息
+    ---
+    tags:
+      - 用户
+    security:
+      - Bearer: []
+    parameters:
+      - name: user_id
+        in: path
+        type: integer
+        required: true
+        description: 用户ID
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            name:
+              type: string
+            student_id:
+              type: string
+            college:
+              type: string
+            phone_number:
+              type: string
+            role:
+              type: string
+              enum: ["admin", "member"]
+    responses:
+      200:
+        description: 更新成功
+      400:
+        description: 参数错误
+      403:
+        description: 权限不足
+      404:
+        description: 用户不存在
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(current_user_id)
+
+        if not current_user or current_user.role != 'admin':
+            return jsonify({"msg": "权限不足"}), 403
+
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"msg": "用户不存在"}), 404
+
+        data = request.get_json()
+
+        # 更新用户信息
+        user.name = data.get('name', user.name)
+        user.student_id = data.get('student_id', user.student_id)
+        user.college = data.get('college', user.college)
+        user.phone_number = data.get('phone_number', user.phone_number)
+        user.role = data.get('role', user.role)
+
+        db.session.commit()
+
+        return jsonify({"msg": "用户信息更新成功"}), 200
+    except Exception as e:
+        db.session.rollback()
         return jsonify({"msg": str(e)}), 500 

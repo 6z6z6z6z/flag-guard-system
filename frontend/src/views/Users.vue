@@ -88,7 +88,7 @@
         <el-form-item label="角色" prop="role">
           <el-select v-model="form.role" style="width: 100%">
             <el-option label="管理员" value="admin" />
-            <el-option label="普通用户" value="user" />
+            <el-option label="队员" value="member" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -124,7 +124,7 @@ const form = ref({
   password: '',
   student_id: '',
   college: '',
-  role: 'user',
+  role: 'member',
   points: 0,
   phone_number: ''
 })
@@ -188,7 +188,7 @@ const handleCreate = () => {
     password: '',
     student_id: '',
     college: '',
-    role: 'user',
+    role: 'member',
     points: 0,
     phone_number: ''
   }
@@ -198,7 +198,16 @@ const handleCreate = () => {
 // 编辑用户
 const handleEdit = (row: any) => {
   dialogTitle.value = '编辑用户'
-  form.value = { ...row }
+  form.value = { 
+    id: row.user_id, 
+    username: row.username,
+    name: row.name,
+    password: '',
+    student_id: row.student_id,
+    college: row.college,
+    role: row.role,
+    points: row.total_points || 0,
+    phone_number: row.phone_number }
   dialogVisible.value = true
 }
 
@@ -218,26 +227,30 @@ const handleDelete = async (row: any) => {
   }
 }
 
+// 提交表单
 const handleSubmit = async () => {
   if (!formRef.value) return
-  
-  await formRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        if (form.value.id) {
-          await request.put(`/users/${form.value.id}`, form.value)
-          ElMessage.success('更新成功')
-        } else {
-          await request.post('/users', form.value)
-          ElMessage.success('创建成功')
-        }
-        dialogVisible.value = false
-        fetchUsers()
-      } catch (error) {
-        ElMessage.error(form.value.id ? '更新失败' : '创建失败')
-      }
+
+  try {
+    await formRef.value.validate()
+    const response = await request.put(`/users/${form.value.id}`, {
+      name: form.value.name,
+      student_id: form.value.student_id,
+      college: form.value.college,
+      phone_number: form.value.phone_number,
+      role: form.value.role
+    })
+
+    if (response.data?.msg === '用户信息更新成功') {
+      ElMessage.success('用户信息更新成功')
+      dialogVisible.value = false
+      fetchUsers()
+    } else {
+      ElMessage.error(response.data?.msg || '更新失败')
     }
-  })
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '更新失败')
+  }
 }
 
 onMounted(() => {
