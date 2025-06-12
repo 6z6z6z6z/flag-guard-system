@@ -2,7 +2,7 @@
   <div class="events">
     <div class="header">
       <h2>活动管理</h2>
-      <el-button type="primary" @click="showCreateDialog">创建活动</el-button>
+      <el-button v-if="userStore.userInfo?.role === 'admin'" type="primary" @click="showCreateDialog">创建活动</el-button>
     </div>
 
     <el-table 
@@ -182,6 +182,34 @@ const fetchEvents = async () => {
   }
 }
 
+const registerEvent = async (event: Event) => {
+  try {
+    const response = await request.post(`/events/${event.event_id}/register`)
+    if (response.data?.message === 'Successfully registered for event') {
+      ElMessage.success('报名成功')
+      event.is_registered = true
+    } else {
+      ElMessage.error(response.data?.message || '报名失败')
+    }
+  } catch (error) {
+    ElMessage.error('报名失败')
+  }
+}
+
+const cancelRegistration = async (event: Event) => {
+  try {
+    const response = await request.post(`/events/${event.event_id}/cancel`)
+    if (response.data?.message === 'Successfully cancelled registration') {
+      ElMessage.success('取消报名成功')
+      event.is_registered = false
+    } else {
+      ElMessage.error(response.data?.message || '取消报名失败')
+    }
+  } catch (error) {
+    ElMessage.error('取消报名失败')
+  }
+}
+
 const showCreateDialog = () => {
   isEdit.value = false
   form.value = {
@@ -238,66 +266,6 @@ const handleDelete = async (row: Event) => {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
       // 错误消息已经在请求拦截器中处理
-    }
-  }
-}
-
-// 活动报名
-const registerEvent = async (row: Event) => {
-  try {
-    const eventId = row.event_id
-    if (!eventId) {
-      ElMessage.error('活动ID不存在')
-      return
-    }
-
-    console.log('Registering for event:', row)  // 添加调试日志
-    await request.post(`/events/${eventId}/register`)
-    ElMessage.success('活动注册成功')
-    
-    // 直接更新当前活动的报名状态
-    const index = events.value.findIndex(e => e.event_id === eventId)
-    if (index !== -1) {
-      events.value[index].is_registered = true
-    }
-    
-    // 重新获取活动列表以更新状态
-    await fetchEvents()
-  } catch (error: any) {
-    console.error('注册活动失败:', error)
-    ElMessage.error(error.response?.data?.error || '报名失败')
-  }
-}
-
-// 取消报名
-const cancelRegistration = async (row: Event) => {
-  try {
-    const eventId = row.event_id
-    if (!eventId) {
-      ElMessage.error('活动ID不存在')
-      return
-    }
-
-    console.log('Cancelling registration for event:', row)  // 添加调试日志
-    await ElMessageBox.confirm('确定要取消报名吗？', '提示', {
-      type: 'warning'
-    })
-
-    await request.delete(`/events/${eventId}/register`)
-    ElMessage.success('取消报名成功')
-    
-    // 直接更新当前活动的报名状态
-    const index = events.value.findIndex(e => e.event_id === eventId)
-    if (index !== -1) {
-      events.value[index].is_registered = false
-    }
-    
-    // 重新获取活动列表以更新状态
-    await fetchEvents()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      console.error('取消报名失败:', error)
-      ElMessage.error(error.response?.data?.error || '取消报名失败')
     }
   }
 }
