@@ -38,9 +38,16 @@ def create_event():
         description: 活动创建成功
       401:
         description: 未认证
+      403:
+        description: 权限不足
     """
-    data = request.get_json()
     user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user or user.role != 'admin':
+        return jsonify({'message': '权限不足'}), 403
+
+    data = request.get_json()
     
     event = Event(
         name=data['name'],

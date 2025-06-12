@@ -3,7 +3,7 @@
   <div class="trainings-container">
     <div class="header">
       <h2>训练管理</h2>
-      <el-button type="primary" @click="handleCreate">
+      <el-button v-if="userStore.isAdmin" type="primary" @click="handleCreate">
         创建训练
       </el-button>
     </div>
@@ -286,37 +286,21 @@ const rules = {
 }
 
 const fetchTrainings = async () => {
+  loading.value = true
   try {
-    const response = await request.get('/trainings', {
-      params: {
-        page: 1,
-        per_page: 100  // 获取所有训练
-      }
-    })
-    console.log('获取到的训练列表:', response.data)  // 添加调试日志
-    
-    // 处理返回的数据结构
-    if (response.data && response.data.items) {
-      console.log('设置训练列表数据:', response.data.items)  // 添加调试日志
-      trainings.value = response.data.items.map((training: Training) => ({
-        ...training,
-        registered: Boolean(training.registered),
-        status: training.status || null
-      }))
-    } else if (Array.isArray(response.data)) {
-      console.log('设置训练列表数据:', response.data)  // 添加调试日志
-      trainings.value = response.data.map((training: Training) => ({
-        ...training,
-        registered: Boolean(training.registered),
-        status: training.status || null
-      }))
-    } else {
-      console.error('训练列表数据格式不正确:', response.data)  // 添加调试日志
-      ElMessage.error('获取训练列表失败：数据格式不正确')
+    const response = await request.get('/trainings')
+    if (response.data) {
+      trainings.value = response.data.map((training: any) => {
+        return {
+          ...training,
+          registered: Boolean(training.registered)  // 确保转换为布尔值
+        }
+      })
     }
-  } catch (error: any) {
-    console.error('获取训练列表失败:', error)
-    ElMessage.error(error.response?.data?.error || '获取训练列表失败')
+  } catch (error) {
+    ElMessage.error('获取训练列表失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -406,51 +390,32 @@ const isTrainingEnded = (training: any) => {
 }
 
 // 报名训练
-const handleRegister = async (training: Training) => {
+const handleRegister = async (training: any) => {
   try {
-    if (isTrainingEnded(training)) {
-      ElMessage.error('训练已结束，无法报名')
-      return
+    const response = await request.post(`/trainings/${training.training_id}/register`)
+    if (response.data?.message === 'Successfully registered for training') {
+      ElMessage.success('报名成功')
+      training.registered = true
+    } else {
+      ElMessage.error(response.data?.message || '报名失败')
     }
-    await request.post(`/trainings/${training.training_id}/register`)
-    ElMessage.success('报名成功')
-    // 直接更新本地状态
-    const index = trainings.value.findIndex(t => t.training_id === training.training_id)
-    if (index !== -1) {
-      trainings.value[index].registered = true
-      trainings.value[index].status = 'registered'
-    }
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || '报名失败')
+  } catch (error) {
+    ElMessage.error('报名失败')
   }
 }
 
 // 取消报名
-const handleCancelRegister = async (training: Training) => {
+const handleCancelRegister = async (training: any) => {
   try {
-    if (isTrainingEnded(training)) {
-      ElMessage.error('训练已结束，无法取消报名')
-      return
+    const response = await request.post(`/trainings/${training.training_id}/cancel`)
+    if (response.data?.message === 'Successfully cancelled registration') {
+      ElMessage.success('取消报名成功')
+      training.registered = false
+    } else {
+      ElMessage.error(response.data?.message || '取消报名失败')
     }
-    if (training.status === 'awarded') {
-      ElMessage.error('已参加训练，无法取消报名')
-      return
-    }
-    await ElMessageBox.confirm('确定要取消报名吗？', '提示', {
-      type: 'warning'
-    })
-    await request.delete(`/trainings/${training.training_id}/register`)
-    ElMessage.success('取消报名成功')
-    // 直接更新本地状态
-    const index = trainings.value.findIndex(t => t.training_id === training.training_id)
-    if (index !== -1) {
-      trainings.value[index].registered = false
-      trainings.value[index].status = null
-    }
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.error || '取消报名失败')
-    }
+  } catch (error) {
+    ElMessage.error('取消报名失败')
   }
 }
 

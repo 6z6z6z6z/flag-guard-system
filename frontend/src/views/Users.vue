@@ -9,9 +9,9 @@
           class="search-input"
           @input="handleSearch"
         />
-        <el-button type="primary" @click="handleCreate">
+        <!-- <el-button type="primary" @click="handleCreate">
           创建用户
-        </el-button>
+        </el-button> -->
       </div>
     </div>
 
@@ -20,6 +20,7 @@
       <el-table-column prop="name" label="姓名" />
       <el-table-column prop="student_id" label="学号" />
       <el-table-column prop="college" label="学院" />
+      <el-table-column prop="phone_number" label="手机号" />
       <el-table-column prop="role" label="角色">
         <template #default="{ row }">
           <el-tag :type="row.role === 'admin' ? 'danger' : 'info'">
@@ -81,13 +82,13 @@
         <el-form-item label="学院" prop="college">
           <el-input v-model="form.college" />
         </el-form-item>
-        <el-form-item label="密码" prop="password" v-if="!form.id">
-          <el-input v-model="form.password" type="password" />
+        <el-form-item label="手机号" prop="phone_number">
+          <el-input v-model="form.phone_number" />
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="form.role" style="width: 100%">
             <el-option label="管理员" value="admin" />
-            <el-option label="普通用户" value="user" />
+            <el-option label="队员" value="member" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -123,17 +124,18 @@ const form = ref({
   password: '',
   student_id: '',
   college: '',
-  role: 'user',
-  points: 0
+  role: 'member',
+  points: 0,
+  phone_number: ''
 })
 
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
   student_id: [{ required: true, message: '请输入学号', trigger: 'blur' }],
   college: [{ required: true, message: '请输入学院', trigger: 'blur' }],
-  role: [{ required: true, message: '请选择角色', trigger: 'change' }]
+  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
+  phone_number: [{ required: true, message: '请输入手机号', trigger: 'blur' }, { pattern: /^\d{11}$/, message: '手机号格式不正确', trigger: 'blur' }]
 }
 
 // 获取用户列表
@@ -176,26 +178,36 @@ const handleCurrentChange = (val: number) => {
   fetchUsers()
 }
 
-// 创建用户
-const handleCreate = () => {
-  dialogTitle.value = '创建用户'
-  form.value = {
-    id: null,
-    username: '',
-    name: '',
-    password: '',
-    student_id: '',
-    college: '',
-    role: 'user',
-    points: 0
-  }
-  dialogVisible.value = true
-}
+// // 创建用户
+// const handleCreate = () => {
+//   dialogTitle.value = '创建用户'
+//   form.value = {
+//     id: null,
+//     username: '',
+//     name: '',
+//     password: '',
+//     student_id: '',
+//     college: '',
+//     role: 'member',
+//     points: 0,
+//     phone_number: ''
+//   }
+//   dialogVisible.value = true
+// }
 
 // 编辑用户
 const handleEdit = (row: any) => {
   dialogTitle.value = '编辑用户'
-  form.value = { ...row }
+  form.value = { 
+    id: row.user_id, 
+    username: row.username,
+    name: row.name,
+    password: '',
+    student_id: row.student_id,
+    college: row.college,
+    role: row.role,
+    points: row.total_points || 0,
+    phone_number: row.phone_number }
   dialogVisible.value = true
 }
 
@@ -215,26 +227,30 @@ const handleDelete = async (row: any) => {
   }
 }
 
+// 提交表单
 const handleSubmit = async () => {
   if (!formRef.value) return
-  
-  await formRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        if (form.value.id) {
-          await request.put(`/users/${form.value.id}`, form.value)
-          ElMessage.success('更新成功')
-        } else {
-          await request.post('/users', form.value)
-          ElMessage.success('创建成功')
-        }
-        dialogVisible.value = false
-        fetchUsers()
-      } catch (error) {
-        ElMessage.error(form.value.id ? '更新失败' : '创建失败')
-      }
+
+  try {
+    await formRef.value.validate()
+    const response = await request.put(`/users/${form.value.id}`, {
+      name: form.value.name,
+      student_id: form.value.student_id,
+      college: form.value.college,
+      phone_number: form.value.phone_number,
+      role: form.value.role
+    })
+
+    if (response.data?.msg === '用户信息更新成功') {
+      ElMessage.success('用户信息更新成功')
+      dialogVisible.value = false
+      fetchUsers()
+    } else {
+      ElMessage.error(response.data?.msg || '更新失败')
     }
-  })
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '更新失败')
+  }
 }
 
 onMounted(() => {
@@ -254,11 +270,6 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
 .search-input {
   width: 300px;
 }
@@ -268,4 +279,4 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
 }
-</style> 
+</style>

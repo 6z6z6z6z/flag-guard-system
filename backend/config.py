@@ -11,7 +11,7 @@ class Config:
     JWT_SECRET_KEY = 'your-super-secret-jwt-key-2024'
     
     # 数据库配置
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'mysql+pymysql://root:0908jr@localhost:3306/app'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,

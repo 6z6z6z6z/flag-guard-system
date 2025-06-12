@@ -33,6 +33,9 @@
         <el-form-item label="学院" prop="college">
           <el-input v-model="userForm.college" disabled />
         </el-form-item>
+        <el-form-item label="手机号" prop="phone_number">
+          <el-input v-model="userForm.phone_number" disabled />
+        </el-form-item>
         <el-form-item label="身高(cm)" prop="height">
           <el-input-number
             v-model="userForm.height"
@@ -78,7 +81,8 @@ const userForm = ref({
   college: '',
   height: 170,
   weight: 60,
-  shoe_size: 40
+  shoe_size: 40,
+  phone_number: ''
 })
 
 const rules = {
@@ -100,7 +104,7 @@ const rules = {
 const fetchUserInfo = async () => {
   try {
     const response = await request.get('/users/profile')
-    const { username, name, student_id, college, height, weight, shoe_size } = response.data.data
+    const { username, name, student_id, college, height, weight, shoe_size, phone_number } = response.data.data
     userForm.value = {
       username,
       name,
@@ -108,7 +112,8 @@ const fetchUserInfo = async () => {
       college,
       height: height || 170,
       weight: weight || 60,
-      shoe_size: shoe_size || 40
+      shoe_size: shoe_size || 40,
+      phone_number: phone_number || ''
     }
   } catch (error) {
     ElMessage.error('获取用户信息失败')
