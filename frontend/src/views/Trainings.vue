@@ -227,7 +227,7 @@
         <el-table-column prop="college" label="学院" />
         <el-table-column prop="created_at" label="报名时间" width="180">
           <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
+            {{ formatRegistrationTime(row.created_at) }}
           </template>
         </el-table-column>
         <el-table-column prop="attendance_status" label="出勤状态" width="120">
@@ -279,7 +279,7 @@ import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Training, Registration } from '@/types/training'
-import { formatDate, isTrainingStarted } from '@/utils/formatDate'
+import { formatDate, isTrainingStarted, formatRegistrationTime } from '@/utils/formatDate'
 
 const trainingStore = useTrainingStore()
 const userStore = useUserStore()
