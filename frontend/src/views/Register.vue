@@ -9,7 +9,7 @@
         :model="registerForm"
         :rules="rules"
         label-width="80px"
-        @submit.prevent="handleRegister"
+        @submit.prevent="handleSubmit"
       >
         <el-form-item label="用户名" prop="username">
           <el-input v-model="registerForm.username" placeholder="请输入用户名" />
@@ -44,7 +44,9 @@
           </el-button>
         </el-form-item>
       </el-form>
-      <el-button v-if="showReturnButton" @click="router.push('/login')" block>返回登录</el-button>
+      <div class="register-link">
+        <router-link to="/login">已有账号？立即登录</router-link>
+      </div>
     </el-card>
   </div>
 </template>
@@ -52,15 +54,14 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { useUserStore } from '../stores/user'
 
 const router = useRouter()
-const userStore = useUserStore()
 const loading = ref(false)
 const formRef = ref<FormInstance>()
-const showReturnButton = ref(false)
+const userStore = useUserStore()
 
 const registerForm = reactive({
   username: '',
@@ -96,33 +97,43 @@ const rules = {
   ]
 }
 
-const handleRegister = async () => {
+const handleSubmit = async () => {
   if (!formRef.value) return
   
   try {
-    await formRef.value.validate()
     loading.value = true
-    const res = await userStore.register(registerForm)
-    if (res.status === 201) {
-      ElMessage({
+    await formRef.value.validate()
+    
+    // 注册
+    await userStore.register(registerForm)
+    
+    // 注册成功，显示确认对话框
+    ElMessageBox.confirm(
+      '注册成功！是否立即登录？',
+      '提示',
+      {
+        confirmButtonText: '立即登录',
+        cancelButtonText: '稍后登录',
         type: 'success',
-        message: '注册成功',
-        duration: 2000
-      })
-      setTimeout(() => {
-        showReturnButton.value = true
-      }, 1000)
-    } else {
-      ElMessage.error(res.data?.msg || '注册失败，请重试')
-    }
+        showClose: false,
+        closeOnClickModal: false,
+        closeOnPressEscape: false
+      }
+    ).then(() => {
+      // 用户点击"立即登录"，跳转到登录页
+      router.push('/login')
+    }).catch(() => {
+      // 用户点击"稍后登录"，清空表单
+      formRef.value?.resetFields()
+    })
   } catch (error: any) {
-    if (error.response?.data?.msg) {
-      ElMessage.error(error.response.data.msg)
-    } else if (error.message) {
-      ElMessage.error(error.message)
-    } else {
-      ElMessage.error('注册失败，请重试')
-    }
+    console.error('注册失败:', error)
+    // 显示错误消息，但不跳转
+    ElMessage({
+      type: 'error',
+      message: error.response?.data?.msg || '注册失败，请稍后重试',
+      duration: 3000
+    })
   } finally {
     loading.value = false
   }
@@ -150,5 +161,19 @@ const handleInput = (field: keyof typeof registerForm) => {
   text-align: center;
   margin: 0;
   color: #409eff;
+}
+
+.register-link {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.register-link a {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.register-link a:hover {
+  text-decoration: underline;
 }
 </style>

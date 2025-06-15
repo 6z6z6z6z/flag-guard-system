@@ -1,7 +1,7 @@
 <template>
-  <div class="review-container">
+  <div class="attendance-container">
     <div class="header">
-      <h2>考勤审核</h2>
+      <h2>考勤名单</h2>
       <el-button @click="goBack">返回</el-button>
     </div>
 
@@ -28,28 +28,6 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button-group>
-              <el-button 
-                type="success" 
-                size="small" 
-                @click="handleReview(row, 'attended')"
-                :disabled="row.status === 'attended'"
-              >
-                签到
-              </el-button>
-              <el-button 
-                type="danger" 
-                size="small" 
-                @click="handleReview(row, 'absent')"
-                :disabled="row.status === 'absent'"
-              >
-                缺勤
-              </el-button>
-            </el-button-group>
-          </template>
-        </el-table-column>
       </el-table>
     </el-card>
   </div>
@@ -58,7 +36,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
 import dayjs from 'dayjs'
 
@@ -89,37 +67,11 @@ const fetchAttendanceList = async () => {
   }
 }
 
-// 处理考勤审核
-const handleReview = async (row: Attendance, status: string) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要将 ${row.username} 的考勤状态设置为"${getStatusText(status)}"吗？`,
-      '确认操作',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    await request.post(`/trainings/${trainingId}/attendance/${row.user_id}/review`, {
-      status
-    })
-
-    ElMessage.success('审核成功')
-    await fetchAttendanceList()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('审核失败:', error)
-      ElMessage.error('审核失败')
-    }
-  }
-}
-
 // 格式化日期
 const formatDate = (date: string) => {
   if (!date) return ''
-  return dayjs(date).format('YYYY-MM-DD HH:mm')
+  // 将UTC时间转换为本地时间 (UTC+8)
+  return dayjs(date).add(8, 'hour').format('YYYY-MM-DD HH:mm:ss')
 }
 
 // 获取状态类型
@@ -161,7 +113,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.review-container {
+.attendance-container {
   padding: 20px;
   background-color: #f5f7fa;
   min-height: calc(100vh - 60px);
@@ -195,13 +147,5 @@ onMounted(() => {
   background-color: #f5f7fa;
   color: #606266;
   font-weight: 600;
-}
-
-:deep(.el-button-group) {
-  display: inline-flex;
-}
-
-:deep(.el-button-group .el-button) {
-  margin: 0;
 }
 </style> 

@@ -1,117 +1,81 @@
-import axios from 'axios'
-import { ElMessage } from 'element-plus'
-import router from '../router'
+import axios, { AxiosHeaders, AxiosInstance, AxiosRequestConfig } from 'axios'
+import { useUserStore } from '@/stores/user'
 
-// ´´½¨axiosÊµÀı
-const request = axios.create({
-  baseURL: '/api',
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+// å®šä¹‰APIå“åº”æ¥å£
+export interface ApiResponse<T = any> {
+  code: number
+  msg: string
+  data: T
+}
+
+// åˆ›å»ºaxioså®ä¾‹
+const instance: AxiosInstance = axios.create({
+  timeout: 10000
 })
 
-// ÇëÇóÀ¹½ØÆ÷
-request.interceptors.request.use(
+instance.interceptors.request.use(
   config => {
-    // È·±£headers¶ÔÏó´æÔÚ
-    config.headers = config.headers || {}
-    
-    // ´ÓlocalStorage»ñÈ¡token
-    const token = localStorage.getItem('token')
-    console.log('Current token:', token)  // Ìí¼Óµ÷ÊÔÈÕÖ¾
-    
-    if (token) {
-      // ¼ì²étokenÊÇ·ñÒÑ¾­°üº¬BearerÇ°×º
-      const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`
-      config.headers.Authorization = authHeader
-      
-      // ´òÓ¡ÇëÇóĞÅÏ¢£¬ÓÃÓÚµ÷ÊÔ
-      console.log('Request:', {
-        url: config.url,
-        method: config.method,
-        headers: config.headers,
-        baseURL: config.baseURL,
-        fullURL: `${config.baseURL}${config.url}`,
-        authHeader: authHeader  // Ìí¼Óµ÷ÊÔÈÕÖ¾
-      })
-    } else {
-      console.warn('No token found in localStorage')  // Ìí¼Óµ÷ÊÔÈÕÖ¾
+    // åœ¨æ‹¦æˆªå™¨å‡½æ•°å†…éƒ¨è°ƒç”¨ useUserStore()ï¼Œç¡®ä¿è·å–åˆ°çš„æ˜¯åˆå§‹åŒ–åçš„å®ä¾‹
+    // const userStore = useUserStore()
+
+    // ç¡®ä¿ URL ä¸ä»¥ http å¼€å¤´ï¼Œè¿™æ ·æˆ‘ä»¬å°±å¯ä»¥å®‰å…¨åœ°æ·»åŠ  /api å‰ç¼€
+    if (config.url && !config.url.startsWith('http')) {
+      // ç»Ÿä¸€æ·»åŠ  /api å‰ç¼€
+      config.url = config.url.startsWith('/') ? `/api${config.url}` : `/api/${config.url}`;
     }
+
+    const token = localStorage.getItem('token')
+
+    const isAuthPath = config.url?.includes('/api/auth/login') || config.url?.includes('/api/auth/register')
+
+    if (token && !isAuthPath) {
+      if (!config.headers) {
+        config.headers = new AxiosHeaders()
+      }
+      config.headers.set('Authorization', `Bearer ${token}`)
+    }
+    
     return config
   },
   error => {
-    console.error('Request error:', error)
     return Promise.reject(error)
   }
 )
 
-// ÏìÓ¦À¹½ØÆ÷
-request.interceptors.response.use(
+instance.interceptors.response.use(
   response => {
-    // ´òÓ¡ÏìÓ¦ĞÅÏ¢£¬ÓÃÓÚµ÷ÊÔ
-    console.log('Response:', {
-      url: response.config.url,
-      status: response.status,
-      data: response.data,
-      baseURL: response.config.baseURL,
-      fullURL: `${response.config.baseURL}${response.config.url}`
-    })
+    // æ ¸å¿ƒä¿®å¤ï¼šå¦‚æœHTTPçŠ¶æ€ç ä¸º200ï¼Œä½†å“åº”ä½“ä¸æ˜¯æˆ‘ä»¬æœŸæœ›çš„æ ‡å‡†æ ¼å¼
+    if (response.status === 200 && (typeof response.data !== 'object' || response.data === null || !('code' in response.data))) {
+      // æˆ‘ä»¬å°†å…¶åŒ…è£…æˆæ ‡å‡†çš„æˆåŠŸå“åº”ï¼Œå¹¶æ”¾å› response.data ä¸­
+      response.data = { code: 200, msg: 'æ“ä½œæˆåŠŸ', data: response.data }
+      return response
+    }
+
+    // å¯¹äºç¬¦åˆæˆ‘ä»¬æ ‡å‡†æ ¼å¼çš„å“åº”ï¼Œå¦‚æœä¸šåŠ¡ç ä¸æ˜¯200æˆ–201ï¼Œåˆ™å½“ä½œé”™è¯¯å¤„ç†
+    if (response.data.code && response.data.code !== 200 && response.data.code !== 201) {
+      return Promise.reject(new Error(response.data.msg || 'Error'))
+    }
     
+    // å¯¹äºæ ‡å‡†çš„æˆåŠŸå“åº”ï¼Œæˆ‘ä»¬ç›´æ¥è¿”å› responseï¼Œè®©ç»„ä»¶ä» response.data ä¸­å–å€¼
     return response
   },
   error => {
     console.error('Response error:', error)
-    
-    if (error.response) {
-      const { status, data } = error.response
-      
-      // ´òÓ¡´íÎóĞÅÏ¢£¬ÓÃÓÚµ÷ÊÔ
-      console.error('Error details:', {
-        status,
-        data,
-        config: error.config,
-        baseURL: error.config?.baseURL,
-        fullURL: error.config ? `${error.config.baseURL}${error.config.url}` : undefined
-      })
-      
-      switch (status) {
-        case 401:
-          ElMessage.error(data?.error || data?.msg || 'Î´ÊÚÈ¨£¬ÇëÖØĞÂµÇÂ¼')
-          localStorage.removeItem('token')
-          router.push('/login')
-          break
-        case 403:
-          ElMessage.error(data?.error || data?.msg || '¾Ü¾ø·ÃÎÊ')
-          break
-        case 404:
-          ElMessage.error(data?.error || data?.msg || 'ÇëÇóµÄ×ÊÔ´²»´æÔÚ')
-          break
-        case 422:
-          ElMessage.error(data?.error || data?.msg || 'ÇëÇó²ÎÊı´íÎó')
-          break
-        case 500: {
-          // Ê¹ÓÃ¿é¼¶×÷ÓÃÓòÀ´ÉùÃ÷±äÁ¿
-          const errorMessage = data?.error || data?.msg || '·şÎñÆ÷´íÎó'
-          console.error('Server error:', {
-            message: errorMessage,
-            details: data?.details,
-            stack: data?.stack
-          })
-          ElMessage.error(errorMessage)
-          break
-        }
-        default:
-          ElMessage.error(data?.error || data?.msg || 'Î´Öª´íÎó')
-      }
-    } else if (error.request) {
-      ElMessage.error('ÍøÂç´íÎó£¬Çë¼ì²éÍøÂçÁ¬½Ó')
-    } else {
-      ElMessage.error('ÇëÇóÅäÖÃ´íÎó')
+    if (error.response?.status === 401) {
+      // åœ¨æ‹¦æˆªå™¨å‡½æ•°å†…éƒ¨è°ƒç”¨ useUserStore()
+      const userStore = useUserStore()
+      userStore.logout()
     }
-    
     return Promise.reject(error)
   }
 )
+
+// å°è£…è¯·æ±‚æ–¹æ³•ï¼Œæ³¨æ„ç°åœ¨è¿”å›çš„æ˜¯ ApiResponse
+const request = {
+  get: <T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> => instance.get(url, config).then(res => res.data),
+  post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> => instance.post(url, data, config).then(res => res.data),
+  put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> => instance.put(url, data, config).then(res => res.data),
+  delete: <T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> => instance.delete(url, config).then(res => res.data)
+}
 
 export default request 

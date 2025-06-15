@@ -71,22 +71,31 @@ const handleLogin = async () => {
     loading.value = true
     
     // 登录
-    await userStore.login(loginForm.username, loginForm.password)
+    const loginResult = await userStore.login(loginForm.username, loginForm.password)
+    console.log('Login result:', loginResult)
     
-    // 显示成功消息
-    ElMessage({
-      type: 'success',
-      message: '登录成功',
-      duration: 2000
-    })
+    // 确保token已经设置
+    const currentToken = userStore.getToken()
+    console.log('Current token after login:', currentToken)
+    
+    if (!currentToken) {
+      throw new Error('登录失败：未获取到token')
+    }
 
-    // 等待一下确保token被设置
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
     // 获取用户信息
     try {
       await userStore.getUserInfo()
       const userInfo = userStore.userInfo
+      console.log('User info after login:', userInfo)
+      
+      // 显示成功消息
+      ElMessage({
+        type: 'success',
+        message: '登录成功',
+        duration: 2000
+      })
+
+      // 根据用户角色跳转到不同页面
       if (userInfo) {
         if (userInfo.role === 'admin' || userInfo.role === 'captain') {
           router.replace('/dashboard')
@@ -96,21 +105,17 @@ const handleLogin = async () => {
       } else {
         router.replace('/')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('获取用户信息失败:', error)
-      ElMessage.error('获取用户信息失败，请重新登录')
+      ElMessage.error(error.response?.data?.msg || '获取用户信息失败，请重新登录')
       userStore.logout()
       return
     }
   } catch (error: any) {
     console.error('登录失败:', error)
-    if (error.response?.data?.msg) {
-      ElMessage.error(error.response.data.msg)
-    } else if (error.message) {
-      ElMessage.error(error.message)
-    } else {
-      ElMessage.error('登录失败，请检查用户名和密码')
-    }
+    // 统一处理错误消息
+    const errorMessage = error.response?.data?.msg || error.message || '登录失败，请检查用户名和密码'
+    ElMessage.error(errorMessage)
   } finally {
     loading.value = false
   }

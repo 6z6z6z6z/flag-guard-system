@@ -34,13 +34,14 @@ console.error = (...args) => {
 }
 
 // 使用插件
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
+
+// !! 注意：现在所有初始化逻辑都在 router/index.ts 的导航守卫中处理
+
 app.use(router)
 app.use(ElementPlus, {
-  locale: zhCn,
+  locale: zhCn
 })
 
-// 等待路由准备就绪后再挂载应用
-router.isReady().then(() => {
-  app.mount('#app')
-}) 
+app.mount('#app')

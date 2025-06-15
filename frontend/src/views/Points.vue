@@ -68,9 +68,36 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '../utils/request'
+import { formatDateTime } from '../utils/format'
+
+// 定义类型
+interface PointHistoryItem {
+  history_id: number;
+  user_id: number;
+  points_change: number;
+  change_type: string;
+  description: string;
+  related_id: number | null;
+  change_time: string;
+}
+
+interface PointHistoryResponse {
+  items: PointHistoryItem[];
+  total: number;
+  pages: number;
+  current_page: number;
+  total_points: number;
+}
+
+interface PointStatisticsResponse {
+  total_points: number;
+  monthly_points: number;
+  last_month_points: number;
+  recent_history: PointHistoryItem[];
+}
 
 // 数据
-const pointHistory = ref([])
+const pointHistory = ref<PointHistoryItem[]>([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -82,15 +109,20 @@ const lastMonthPoints = ref(0)
 // 获取积分历史
 const fetchPointHistory = async () => {
   try {
-    const response = await request.get('/points/history', {
+    const response = await request.get<PointHistoryResponse>('/points/history', {
       params: {
         page: currentPage.value,
         per_page: pageSize.value,
-        type: filterType.value || undefined
+        type: filterType.value
       }
     })
-    pointHistory.value = response.data.items
-    total.value = response.data.total
+    if (response && response.data) {
+      const { items = [], total: totalCount = 0 } = response.data
+      pointHistory.value = items
+      total.value = totalCount
+    } else {
+      ElMessage.error('获取积分历史失败：数据格式错误')
+    }
   } catch (error) {
     ElMessage.error('获取积分历史失败')
   }
@@ -99,10 +131,14 @@ const fetchPointHistory = async () => {
 // 获取积分统计
 const fetchPointsStatistics = async () => {
   try {
-    const response = await request.get('/points/statistics')
-    totalPoints.value = response.data.total_points
-    monthlyPoints.value = response.data.monthly_points
-    lastMonthPoints.value = response.data.last_month_points
+    const response = await request.get<PointStatisticsResponse>('/points/statistics')
+    if (response && response.data) {
+      totalPoints.value = response.data.total_points || 0
+      monthlyPoints.value = response.data.monthly_points || 0
+      lastMonthPoints.value = response.data.last_month_points || 0
+    } else {
+      ElMessage.error('获取积分统计失败：数据格式错误')
+    }
   } catch (error) {
     ElMessage.error('获取积分统计失败')
   }
@@ -119,21 +155,14 @@ const handleCurrentChange = (val: number) => {
   fetchPointHistory()
 }
 
-// 格式化日期时间
-const formatDateTime = (dateStr: string) => {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  // 添加8小时时区偏移
-  date.setHours(date.getHours() + 8)
-  return date.toLocaleString()
-}
-
 // 获取变动类型文本
 const getChangeTypeText = (type: string) => {
   const typeMap: Record<string, string> = {
     flag: '升降旗',
     training: '训练',
-    event: '活动'
+    event: '活动',
+    other: '其他',
+    training_award: '训练'
   }
   return typeMap[type] || type
 }

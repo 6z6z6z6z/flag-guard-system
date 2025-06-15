@@ -220,8 +220,19 @@ const filterStatus = ref('all')
 const getImageUrl = (url: string) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
-  // 确保URL以/api开头
-  return url.startsWith('/api') ? url : `/api${url}`
+
+  // 后端返回的URL是 /api/uploads/xxx.jpg
+  // 我们需要把它变成 /uploads/xxx.jpg 以便代理
+  if (url.startsWith('/api/uploads/')) {
+    return url.substring(4) // 去掉 /api
+  }
+  
+  if (url.startsWith('/uploads/')) {
+    return url
+  }
+
+  // 对于历史数据，可能没有前缀
+  return `/uploads/${url.split('/').pop()}`
 }
 
 // 上传相关方法
@@ -245,15 +256,14 @@ const customUpload = async (options: any) => {
     const formData = new FormData()
     formData.append('file', options.file)
     
-    const response = await request.post('/files/upload', formData, {
+    const response = await request.post('/files/files/upload', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
-        'Authorization': `Bearer ${userStore.token}`
+        'Content-Type': 'multipart/form-data'
       }
     })
     
-    if (response.data && response.data.data && response.data.data.url) {
-      flagForm.value.photo_url = response.data.data.url
+    if (response.data && response.data.url) {
+      flagForm.value.photo_url = response.data.url
       ElMessage.success('上传成功')
     } else {
       ElMessage.error('上传失败')
@@ -270,37 +280,20 @@ const submitRecord = async () => {
   
   await formRef.value.validate(async (valid) => {
     if (valid) {
-      if (!flagForm.value.photo_url) {
-        ElMessage.warning('请上传照片')
-        return
-      }
-
       submitting.value = true
       try {
-        console.log('Submitting flag record:', flagForm.value)
-        const response = await request.post('/flag/records', {
-          date: flagForm.value.date,
-          type: flagForm.value.type,
-          photo_url: flagForm.value.photo_url
-        })
-        console.log('Server response:', response)
-        
-        if (response.data && response.data.msg === 'success') {
-          ElMessage.success('记录提交成功')
+        const response = await request.post('/flag/records', flagForm.value)
+        if (response.code === 200) {
+          ElMessage.success(response.msg || '提交成功')
           // 重置表单
-          flagForm.value = {
-            date: '',
-            type: 'raise',
-            photo_url: ''
-          }
-          // 刷新记录列表
+          formRef.value?.resetFields()
+          flagForm.value.photo_url = ''
+          // 刷新历史记录
           await fetchRecords()
         } else {
-          console.error('Unexpected response:', response)
-          ElMessage.error(response.data?.msg || '提交失败')
+          ElMessage.error(response.msg || '提交失败')
         }
       } catch (error: any) {
-        console.error('Error submitting record:', error)
         ElMessage.error(error.response?.data?.msg || '提交失败')
       } finally {
         submitting.value = false
@@ -312,6 +305,10 @@ const submitRecord = async () => {
 // 获取记录列表
 const fetchRecords = async () => {
   try {
+    console.log('Starting fetchRecords')
+    console.log('Current user info:', userStore.userInfo)
+    console.log('Is admin:', userStore.isAdmin)
+    
     const params: {
       page: number;
       per_page: number;
@@ -326,14 +323,23 @@ const fetchRecords = async () => {
     
     // 根据用户角色选择不同的API端点
     const endpoint = userStore.isAdmin ? '/flag/records/review' : '/flag/records'
-    const response = await request.get(endpoint, { params })
+    console.log('Fetching records from endpoint:', endpoint, 'with params:', params)
     
-    if (response.data?.data) {
-      records.value = response.data.data.items
-      total.value = response.data.data.total
+    const response = await request.get(endpoint, { params })
+    console.log('Response:', response)
+    
+    if (response && response.data) {
+      records.value = response.data.items || []
+      total.value = response.data.total || 0
+      console.log('Updated records:', records.value)
+      console.log('Total records:', total.value)
+    } else {
+      console.error('Invalid response format:', response)
+      ElMessage.error('获取记录失败：响应格式错误')
     }
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.msg || '获取记录失败')
+    console.error('Error fetching records:', error)
+    ElMessage.error(error.message || '获取记录失败')
   }
 }
 
@@ -389,11 +395,11 @@ const getStatusText = (status: string) => {
 const handleApprove = async (record: any) => {
   try {
     const response = await request.post(`/flag/records/${record.record_id}/approve`)
-    if (response.data?.msg === 'success') {
-      ElMessage.success('审核通过成功')
+    if (response.code === 200) {
+      ElMessage.success(response.msg || '审核通过成功')
       await fetchRecords()
     } else {
-      ElMessage.error(response.data?.msg || '审核失败')
+      ElMessage.error(response.msg || '审核失败')
     }
   } catch (error: any) {
     ElMessage.error(error.response?.data?.msg || '审核失败')
@@ -403,11 +409,11 @@ const handleApprove = async (record: any) => {
 const handleReject = async (record: any) => {
   try {
     const response = await request.post(`/flag/records/${record.record_id}/reject`)
-    if (response.data?.msg === 'success') {
-      ElMessage.success('已拒绝该记录')
+    if (response.code === 200) {
+      ElMessage.success(response.msg || '已拒绝该记录')
       await fetchRecords()
     } else {
-      ElMessage.error(response.data?.msg || '操作失败')
+      ElMessage.error(response.msg || '操作失败')
     }
   } catch (error: any) {
     ElMessage.error(error.response?.data?.msg || '操作失败')
@@ -416,7 +422,7 @@ const handleReject = async (record: any) => {
 
 // 预览照片
 const handlePreview = (url: string) => {
-  previewUrl.value = url
+  previewUrl.value = getImageUrl(url)
   previewVisible.value = true
 }
 

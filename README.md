@@ -75,11 +75,6 @@ npm install
 npm run serve
 ```
 
-4. 构建生产版本：
-```bash
-npm run build
-```
-
 ## 默认账户
 
 - 管理员账户：

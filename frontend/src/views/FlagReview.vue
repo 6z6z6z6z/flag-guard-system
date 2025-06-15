@@ -37,8 +37,11 @@
               v-if="scope.row.photo_url"
               :src="scope.row.photo_url"
               :preview-src-list="[scope.row.photo_url]"
+              :preview-teleported="true"
+              :z-index="9999"
               fit="cover"
               class="table-image"
+              style="z-index: 9999"
             />
             <span v-else>无照片</span>
           </template>
@@ -116,6 +119,7 @@ const filterStatus = ref('pending')
 // 获取记录列表
 const fetchRecords = async () => {
   try {
+    console.log('Fetching flag records for review...')
     const response = await request.get('/flag/records/review', {
       params: {
         page: currentPage.value,
@@ -123,25 +127,43 @@ const fetchRecords = async () => {
         status: filterStatus.value
       }
     })
-    records.value = response.data.items.map((item: any) => ({
-      ...item,
-      reviewing: false
-    }))
-    total.value = response.data.total
-  } catch (error) {
-    ElMessage.error('获取记录失败')
+    console.log('Response:', response)
+    
+    if (response.data?.data) {
+      records.value = response.data.data.items.map((item: any) => ({
+        ...item,
+        reviewing: false
+      }))
+      total.value = response.data.data.total
+      console.log('Records loaded:', records.value)
+    } else {
+      console.error('Invalid response format:', response)
+      ElMessage.error('获取记录失败：响应格式错误')
+    }
+  } catch (error: any) {
+    console.error('Error fetching records:', error)
+    console.error('Error details:', {
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    })
+    ElMessage.error(error.response?.data?.msg || '获取记录失败')
   }
 }
 
 // 审核通过
 const handleApprove = async (record: any) => {
+  record.reviewing = true
   try {
-    record.reviewing = true
-    await request.post(`/flag/records/${record.record_id}/approve`)
-    ElMessage.success('审核通过成功')
-    fetchRecords()
-  } catch (error) {
-    ElMessage.error('操作失败')
+    const response = await request.post(`/flag/records/${record.record_id}/approve`)
+    if (response.code === 200) {
+      ElMessage.success(response.msg || '审核通过成功')
+      fetchRecords()
+    } else {
+      ElMessage.error(response.msg || '审核操作失败')
+    }
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '审核操作失败')
   } finally {
     record.reviewing = false
   }
@@ -150,26 +172,26 @@ const handleApprove = async (record: any) => {
 // 审核拒绝
 const handleReject = async (record: any) => {
   try {
-    const result = await ElMessageBox.confirm(
-      '确定要拒绝这条记录吗？',
-      '提示',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
+    await ElMessageBox.confirm('确定要拒绝这条记录吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
     
-    if (result === 'confirm') {
-      record.reviewing = true
-      await request.post(`/flag/records/${record.record_id}/reject`)
-      ElMessage.success('已拒绝')
+    record.reviewing = true
+    const response = await request.post(`/flag/records/${record.record_id}/reject`)
+    if (response.code === 200) {
+      ElMessage.success(response.msg || '已拒绝')
       fetchRecords()
+    } else {
+      ElMessage.error(response.msg || '操作失败')
     }
   } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('操作失败')
+    if (error === 'cancel') {
+      // 用户取消，不做任何事
+      return
     }
+    ElMessage.error(error.response?.data?.msg || '操作失败')
   } finally {
     record.reviewing = false
   }

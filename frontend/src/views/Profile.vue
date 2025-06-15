@@ -103,8 +103,8 @@ const rules = {
 // 获取用户信息
 const fetchUserInfo = async () => {
   try {
-    const response = await request.get('/users/profile')
-    const { username, name, student_id, college, height, weight, shoe_size, phone_number } = response.data.data
+    const response = await request.get('/auth/info')
+    const { username, name, student_id, college, height, weight, shoe_size, phone_number } = response.data
     userForm.value = {
       username,
       name,

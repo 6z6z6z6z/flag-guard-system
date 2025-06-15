@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import { ElMessage } from 'element-plus'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -95,6 +96,23 @@ const routes: RouteRecordRaw[] = [
         name: 'Users',
         component: () => import('../views/Users.vue'),
         meta: { title: '用户管理', icon: 'User', roles: ['admin', 'captain'] }
+      },
+      {
+        path: 'training-attendance/:id',
+        name: 'TrainingAttendance',
+        component: () => import('@/views/TrainingAttendance.vue'),
+        meta: {
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'training-review/:id',
+        name: 'TrainingReview',
+        component: () => import('@/views/TrainingReview.vue'),
+        meta: {
+          requiresAuth: true,
+          requiresAdmin: true
+        }
       }
     ]
   },
@@ -110,56 +128,48 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫
+// 全局前置守卫
 router.beforeEach(async (to, from, next) => {
-  // 设置页面标题
-  document.title = `${to.meta.title || '学生管理系统'}`
-  
-  // 获取 token
-  const token = localStorage.getItem('token')
+  // !! 关键改动：在守卫函数内部获取 store 实例
   const userStore = useUserStore()
-  
-  // 如果是访问登录或注册页面
-  if (to.path === '/login' || to.path === '/register') {
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+
+  if (requiresAuth) {
+    const token = userStore.getToken()
     if (token) {
-      // 如果已登录，重定向到首页
-      next('/')
+      // 如果有 token，但没有用户信息，说明是刷新页面或刚登录
+      if (!userStore.userInfo) {
+        try {
+          // 获取用户信息，这是进入系统的第一步
+          await userStore.getUserInfo()
+          next()
+        } catch (error) {
+          console.error('Authentication error during navigation:', error)
+          userStore.logout() // 清理状态并跳转到登录页
+          ElMessage.error('认证失败，请重新登录')
+          next({ name: 'Login' })
+        }
+      } else {
+        // 用户信息已存在，直接放行
+        next()
+      }
     } else {
-      // 未登录，允许访问登录/注册页面
+      // 没有 token，跳转到登录页
+      ElMessage.warning('请先登录')
+      next({ name: 'Login' })
+    }
+  } else {
+    // 如果目标路由不需要认证
+    if (to.name === 'Login' && userStore.getToken()) {
+      // 如果已登录，访问登录页则重定向到首页
+      next({ path: '/' })
+    } else {
       next()
     }
-    return
   }
-  
-  // 检查是否需要登录
-  if (to.meta.requiresAuth) {
-    if (!token) {
-      // 未登录，重定向到登录页
-      next('/login')
-      return
-    }
-    
-    // 已登录，检查用户信息
-    if (!userStore.userInfo) {
-      try {
-        // 获取用户信息
-        await userStore.getUserInfo()
-      } catch (error) {
-        // 获取用户信息失败，清除 token 并重定向到登录页
-        localStorage.removeItem('token')
-        next('/login')
-        return
-      }
-    }
-    
-    // 检查角色权限
-    if (to.meta.roles && userStore.userInfo && !to.meta.roles.includes(userStore.userInfo.role)) {
-      next('/403')
-      return
-    }
-  }
-  
-  next()
+
+  // 设置页面标题
+  document.title = `${to.meta.title || '学生管理系统'}`
 })
 
 export default router

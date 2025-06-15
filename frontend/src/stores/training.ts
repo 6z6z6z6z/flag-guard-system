@@ -1,94 +1,83 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Training, ApiResponse } from '../types/api'
-import request from '../utils/request'
+import request from '@/utils/request'
+import type { Training, Registration } from '@/types/training'
+
+interface TrainingsResponse {
+  items: Training[];
+  total: number;
+  pages: number;
+  current_page: number;
+}
 
 export const useTrainingStore = defineStore('training', () => {
   const trainings = ref<Training[]>([])
-  const currentTraining = ref<Training | null>(null)
+  const total = ref(0)
   const loading = ref(false)
 
-  // 获取训练列表
-  const getTrainings = async () => {
+  const getTrainings = async (page = 1, per_page = 10) => {
     loading.value = true
     try {
-      const res = await request.get<ApiResponse<Training[]>>('/trainings')
-      trainings.value = res.data.data
-      return res
-    } catch (error) {
-      throw error
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 获取单个训练
-  const getTraining = async (id: number) => {
-    loading.value = true
-    try {
-      const res = await request.get<ApiResponse<Training>>(`/trainings/${id}`)
-      currentTraining.value = res.data.data
-      return res
-    } catch (error) {
-      throw error
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 创建训练
-  const createTraining = async (data: Partial<Training>) => {
-    loading.value = true
-    try {
-      const res = await request.post<ApiResponse<Training>>('/trainings', data)
-      trainings.value.push(res.data.data)
-      return res
-    } catch (error) {
-      throw error
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 更新训练
-  const updateTraining = async (id: number, data: Partial<Training>) => {
-    loading.value = true
-    try {
-      const res = await request.put<ApiResponse<Training>>(`/trainings/${id}`, data)
-      const index = trainings.value.findIndex(t => t.id === id)
-      if (index !== -1) {
-        trainings.value[index] = res.data.data
+      const response = await request.get<TrainingsResponse>('/trainings/', {
+        params: { page, per_page }
+      });
+      if (response.code === 200 && response.data) {
+        trainings.value = response.data.items;
+        total.value = response.data.total;
       }
-      return res
-    } catch (error) {
-      throw error
     } finally {
       loading.value = false
     }
   }
 
-  // 删除训练
+  const createTraining = async (data: Partial<Training>) => {
+    return await request.post('/trainings/', data)
+  }
+
+  const updateTraining = async (id: number, data: Partial<Training>) => {
+    return await request.put(`/trainings/${id}`, data)
+  }
+
   const deleteTraining = async (id: number) => {
-    loading.value = true
-    try {
-      const res = await request.delete<ApiResponse<void>>(`/trainings/${id}`)
-      trainings.value = trainings.value.filter(t => t.id !== id)
-      return res
-    } catch (error) {
-      throw error
-    } finally {
-      loading.value = false
+    return await request.delete(`/trainings/${id}`)
+  }
+
+  const registerTraining = async (trainingId: number) => {
+    return await request.post(`/trainings/${trainingId}/register`)
+  }
+
+  const cancelRegister = async (trainingId: number) => {
+    return await request.delete(`/trainings/${trainingId}/register`)
+  }
+
+  const getRegistrations = async (trainingId: number): Promise<Registration[]> => {
+    const response = await request.get<Registration[] | { registrations: Registration[] }>(`/trainings/${trainingId}/registrations`);
+    if (response.code === 200 && response.data) {
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      if (response.data.registrations) {
+        return response.data.registrations;
+      }
     }
+    return [];
+  }
+
+  const confirmAttendance = async (trainingId: number, updates: any[]) => {
+    return await request.post(`/trainings/${trainingId}/registrations/attendance`, { updates });
   }
 
   return {
     trainings,
-    currentTraining,
+    total,
     loading,
     getTrainings,
-    getTraining,
     createTraining,
     updateTraining,
-    deleteTraining
+    deleteTraining,
+    registerTraining,
+    cancelRegister,
+    getRegistrations,
+    confirmAttendance,
   }
-}) 
+})

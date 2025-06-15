@@ -1,8 +1,12 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from datetime import datetime
 from models import User, Training, Event, FlagRecord
 from extensions import db
-from routes.auth import role_required
+from utils.route_utils import (
+    APIResponse, validate_required_fields, handle_exceptions,
+    validate_json_request, log_operation, role_required
+)
 
 records_bp = Blueprint('records', __name__)
 

@@ -1,92 +1,85 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Event, ApiResponse } from '../types/api'
-import request from '../utils/request'
+import request, { ApiResponse } from '../utils/request'
+
+// å®šä¹‰äº‹ä»¶æ¥å£
+export interface Event {
+  id: number
+  name: string
+  description: string
+  time: string
+  location: string
+  points: number
+  created_at: string
+  updated_at: string
+}
 
 export const useEventStore = defineStore('event', () => {
   const events = ref<Event[]>([])
   const currentEvent = ref<Event | null>(null)
-  const loading = ref(false)
 
-  // »ñÈ¡ÊÂ¼şÁĞ±í
-  const getEvents = async () => {
-    loading.value = true
+  // è·å–æ‰€æœ‰äº‹ä»¶
+  const fetchEvents = async () => {
     try {
-      const res = await request.get<ApiResponse<Event[]>>('/events')
-      events.value = res.data.data
+      const res = await request.get<Event[]>('/events')
+      events.value = res.data
       return res
     } catch (error) {
       throw error
-    } finally {
-      loading.value = false
     }
   }
 
-  // »ñÈ¡µ¥¸öÊÂ¼ş
-  const getEvent = async (id: number) => {
-    loading.value = true
+  // è·å–å•ä¸ªäº‹ä»¶
+  const fetchEventById = async (id: number) => {
     try {
-      const res = await request.get<ApiResponse<Event>>(`/events/${id}`)
-      currentEvent.value = res.data.data
+      const res = await request.get<Event>(`/events/${id}`)
+      currentEvent.value = res.data
       return res
     } catch (error) {
       throw error
-    } finally {
-      loading.value = false
     }
   }
 
-  // ´´½¨ÊÂ¼ş
+  // åˆ›å»ºäº‹ä»¶
   const createEvent = async (data: Partial<Event>) => {
-    loading.value = true
     try {
-      const res = await request.post<ApiResponse<Event>>('/events', data)
-      events.value.push(res.data.data)
+      const res = await request.post<Event>('/events', data)
+      events.value.push(res.data)
       return res
     } catch (error) {
       throw error
-    } finally {
-      loading.value = false
     }
   }
 
-  // ¸üĞÂÊÂ¼ş
+  // æ›´æ–°äº‹ä»¶
   const updateEvent = async (id: number, data: Partial<Event>) => {
-    loading.value = true
     try {
-      const res = await request.put<ApiResponse<Event>>(`/events/${id}`, data)
+      const res = await request.put<Event>(`/events/${id}`, data)
       const index = events.value.findIndex(e => e.id === id)
       if (index !== -1) {
-        events.value[index] = res.data.data
+        events.value[index] = res.data
       }
       return res
     } catch (error) {
       throw error
-    } finally {
-      loading.value = false
     }
   }
 
-  // É¾³ıÊÂ¼ş
+  // åˆ é™¤äº‹ä»¶
   const deleteEvent = async (id: number) => {
-    loading.value = true
     try {
-      const res = await request.delete<ApiResponse<void>>(`/events/${id}`)
+      await request.delete<ApiResponse>(`/events/${id}`)
       events.value = events.value.filter(e => e.id !== id)
-      return res
     } catch (error) {
       throw error
-    } finally {
-      loading.value = false
     }
   }
 
   return {
     events,
     currentEvent,
-    loading,
-    getEvents,
-    getEvent,
+    fetchEvents,
+    fetchEventById,
     createEvent,
     updateEvent,
     deleteEvent

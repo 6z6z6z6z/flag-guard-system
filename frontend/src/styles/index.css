@@ -10,7 +10,7 @@ body {
   height: 100%;
 }
 
-/* ��������ʽ */
+/* 滚动条样式 */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -30,7 +30,38 @@ body {
   background: #a8a8a8;
 }
 
-/* Element Plus ��ʽ���� */
+/* Firefox 滚动条样式 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Safari 滚动条样式 */
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+  * {
+    /* 使用 webkit 特定的滚动条样式 */
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+    }
+    
+    &::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+  }
+}
+
+/* Element Plus 样式覆盖 */
 .el-menu {
   --el-menu-bg-color: #304156;
   --el-menu-text-color: #bfcbd9;
@@ -44,4 +75,63 @@ body {
 
 .el-menu-item:hover {
   background-color: #263445 !important;
+}
+
+/* Element Plus Message 样式覆盖 */
+.el-message--success {
+  --el-message-bg-color: var(--el-color-success-light-9) !important;
+  --el-message-border-color: var(--el-color-success-light-8) !important;
+  --el-message-text-color: var(--el-color-success) !important;
+}
+
+.el-message--error {
+  --el-message-bg-color: var(--el-color-error-light-9) !important;
+  --el-message-border-color: var(--el-color-error-light-8) !important;
+  --el-message-text-color: var(--el-color-error) !important;
+}
+
+.el-message--warning {
+  --el-message-bg-color: var(--el-color-warning-light-9) !important;
+  --el-message-border-color: var(--el-color-warning-light-8) !important;
+  --el-message-text-color: var(--el-color-warning) !important;
+}
+
+.el-message--info {
+  --el-message-bg-color: var(--el-color-info-light-9) !important;
+  --el-message-border-color: var(--el-color-info-light-8) !important;
+  --el-message-text-color: var(--el-color-info) !important;
+}
+
+/* 添加 appearance 属性支持 */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+select,
+textarea {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* 性能优化：使用 transform 代替 left 属性 */
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
 } 

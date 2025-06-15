@@ -10,18 +10,18 @@
 
       <el-form
         ref="formRef"
-        :model="eventForm"
+        :model="form"
         :rules="rules"
         label-width="100px"
         :disabled="submitting"
       >
         <el-form-item label="活动名称" prop="name">
-          <el-input v-model="eventForm.name" placeholder="请输入活动名称" />
+          <el-input v-model="form.name" placeholder="请输入活动名称" />
         </el-form-item>
 
         <el-form-item label="活动时间" prop="time">
           <el-date-picker
-            v-model="eventForm.time"
+            v-model="form.time"
             type="datetime"
             placeholder="选择活动时间"
             :disabled-date="disabledDate"
@@ -30,7 +30,7 @@
 
         <el-form-item label="着装要求" prop="uniform_required">
           <el-input
-            v-model="eventForm.uniform_required"
+            v-model="form.uniform_required"
             type="textarea"
             :rows="2"
             placeholder="请输入着装要求"
@@ -39,7 +39,7 @@
 
         <el-form-item label="关联训练" prop="trainings">
           <el-select
-            v-model="eventForm.trainings"
+            v-model="form.trainings"
             multiple
             filterable
             placeholder="选择关联训练"
@@ -55,7 +55,7 @@
         </el-form-item>
 
         <el-form-item>
-          <el-button type="primary" @click="submitEvent" :loading="submitting">
+          <el-button type="primary" @click="handleSubmit" :loading="submitting">
             创建活动
           </el-button>
         </el-form-item>
@@ -187,7 +187,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitEdit" :loading="submitting">
+          <el-button type="primary" @click="handleSubmit" :loading="submitting">
             保存
           </el-button>
         </span>
@@ -197,7 +197,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, reactive } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
@@ -206,28 +206,26 @@ const formRef = ref<FormInstance>()
 const editFormRef = ref<FormInstance>()
 const submitting = ref(false)
 const dialogVisible = ref(false)
-const currentEvent = ref(null)
+const currentEvent = ref<Event | null>(null)
+const isEdit = ref(false)
 
-// 表单数据
-const eventForm = ref({
+const form = ref<EventForm>({
   name: '',
-  time: '',
+  time: null,
   uniform_required: '',
   trainings: []
 })
 
-const editForm = ref({
+const editForm = ref<EventForm>({
   name: '',
-  time: '',
+  time: null,
   uniform_required: '',
   trainings: []
 })
 
-// 表单验证规则
-const rules: FormRules = {
+const rules = reactive<FormRules>({
   name: [
-    { required: true, message: '请输入活动名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+    { required: true, message: '请输入活动名称', trigger: 'blur' }
   ],
   time: [
     { required: true, message: '请选择活动时间', trigger: 'change' }
@@ -235,28 +233,68 @@ const rules: FormRules = {
   uniform_required: [
     { required: true, message: '请输入着装要求', trigger: 'blur' }
   ]
+})
+
+interface Event {
+  event_id: number
+  name: string
+  time: string | Date
+  uniform_required: string
+  created_by: number
+  created_at: string
+  trainings: Array<{
+    training_id: number
+    name: string
+  }>
+  is_registered?: boolean
 }
 
-// 列表数据
-const events = ref([])
+interface Training {
+  training_id: number
+  name: string
+}
+
+interface EventForm {
+  name: string
+  time: Date | null
+  uniform_required: string
+  trainings: number[]
+}
+
+const loading = ref(false)
+const events = ref<Event[]>([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
-const trainingOptions = ref([])
+const trainingOptions = ref<Training[]>([])
 
 // 获取活动列表
 const fetchEvents = async () => {
+  loading.value = true
   try {
-    const response = await request.get('/events', {
-      params: {
-        page: currentPage.value,
-        per_page: pageSize.value
-      }
-    })
-    events.value = response.data.items
-    total.value = response.data.total
+    const response = await request.get('/events')
+    console.log('获取活动列表响应:', response.data)  // 添加调试日志
+    
+    if (response.data && response.data.data && response.data.data.items) {
+      events.value = response.data.data.items.map((event: any) => {
+        const processedEvent = {
+          ...event,
+          time: new Date(event.time).toLocaleString(),
+          is_registered: Boolean(event.is_registered)
+        }
+        console.log('处理后的活动数据:', processedEvent)  // 添加调试日志
+        return processedEvent
+      })
+    } else {
+      console.warn('无效的活动数据格式:', response.data)  // 添加调试日志
+      events.value = []
+    }
   } catch (error) {
+    console.error('获取活动列表失败:', error)  // 添加调试日志
     ElMessage.error('获取活动列表失败')
+    events.value = []
+  } finally {
+    loading.value = false
   }
 }
 
@@ -281,85 +319,72 @@ const isEventPast = (time: string) => {
 }
 
 // 创建活动
-const submitEvent = async () => {
+const handleSubmit = async () => {
   if (!formRef.value) return
   
-  await formRef.value.validate(async (valid) => {
+  await formRef.value.validate(async (valid: boolean) => {
     if (valid) {
-      submitting.value = true
       try {
-        await request.post('/events', eventForm.value)
-        ElMessage.success('活动创建成功')
-        // 重置表单
-        eventForm.value = {
-          name: '',
-          time: '',
-          uniform_required: '',
-          trainings: []
+        // 处理时间格式
+        const formData = {
+          ...form.value,
+          time: form.value.time ? new Date(form.value.time).toISOString() : null
         }
-        // 刷新列表
-        fetchEvents()
-      } catch (error) {
-        ElMessage.error('创建失败')
-      } finally {
-        submitting.value = false
+        
+        console.log('提交的表单数据:', formData)  // 添加调试日志
+        
+        if (isEdit.value && currentEvent.value) {
+          const response = await request.put(`/events/${currentEvent.value.event_id}`, formData)
+          console.log('更新活动响应:', response.data)  // 添加调试日志
+          ElMessage.success('更新成功')
+        } else {
+          const response = await request.post('/events', formData)
+          console.log('创建活动响应:', response.data)  // 添加调试日志
+          ElMessage.success('创建成功')
+        }
+        dialogVisible.value = false
+        await fetchEvents()
+      } catch (error: any) {
+        console.error('提交表单失败:', error)  // 添加调试日志
+        ElMessage.error(error.response?.data?.msg || (isEdit.value ? '更新失败' : '创建失败'))
       }
     }
   })
 }
 
 // 编辑活动
-const handleEdit = (event: any) => {
+const handleEdit = (event: Event) => {
+  isEdit.value = true
   currentEvent.value = event
   editForm.value = {
     name: event.name,
-    time: event.time,
-    uniform_required: event.uniform_required,
-    trainings: event.trainings.map((t: any) => t.training_id)
+    time: new Date(event.time),  // 转换时间格式
+    uniform_required: event.uniform_required || '',
+    trainings: event.trainings.map(t => t.training_id)
   }
   dialogVisible.value = true
 }
 
-// 提交编辑
-const submitEdit = async () => {
-  if (!editFormRef.value || !currentEvent.value) return
-  
-  await editFormRef.value.validate(async (valid) => {
-    if (valid) {
-      submitting.value = true
-      try {
-        await request.put(`/events/${currentEvent.value.event_id}`, editForm.value)
-        ElMessage.success('更新成功')
-        dialogVisible.value = false
-        fetchEvents()
-      } catch (error) {
-        ElMessage.error('更新失败')
-      } finally {
-        submitting.value = false
-      }
-    }
-  })
-}
-
 // 删除活动
-const handleDelete = async (event: any) => {
+const handleDelete = async (event: Event) => {
   try {
-    await ElMessageBox.confirm(
-      '确定要删除这个活动吗？',
-      '提示',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
+    await ElMessageBox.confirm('确定要删除该活动吗？', '提示', {
+      type: 'warning'
+    })
     
-    await request.delete(`/events/${event.event_id}`)
-    ElMessage.success('删除成功')
-    fetchEvents()
+    const response = await request.delete(`/events/${event.event_id}`)
+    console.log('删除活动响应:', response.data)  // 添加调试日志
+    
+    if (response.data.code === 200) {
+      ElMessage.success('删除成功')
+      await fetchEvents()
+    } else {
+      ElMessage.error(response.data.msg || '删除失败')
+    }
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
+      console.error('删除活动失败:', error)  // 添加调试日志
+      ElMessage.error(error.response?.data?.msg || '删除失败')
     }
   }
 }
@@ -383,6 +408,19 @@ const formatDateTime = (dateStr: string) => {
 onMounted(() => {
   fetchEvents()
   fetchTrainingOptions()
+})
+
+// 监听对话框关闭
+watch(dialogVisible, (val) => {
+  if (!val) {
+    currentEvent.value = null
+    editForm.value = {
+      name: '',
+      time: null,
+      uniform_required: '',
+      trainings: []
+    }
+  }
 })
 </script>
 

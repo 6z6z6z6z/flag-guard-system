@@ -1,118 +1,131 @@
 import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
 import request from '../utils/request'
-import { ElMessage } from 'element-plus'
-import router from '../router'
 
-export const useUserStore = defineStore('user', {
-  state: () => ({
-    token: localStorage.getItem('token') || '',
-    userInfo: null as any
-  }),
+// å®šä¹‰ç”¨æˆ·ä¿¡æ¯æŽ¥å£
+interface UserInfo {
+  id: number
+  username: string
+  name: string
+  role: string
+  college: string
+  student_id: string
+  phone_number: string
+  total_points: number
+}
 
-  getters: {
-    isLoggedIn: (state) => {
-      console.log('Checking login status, token:', state.token)
-      return !!state.token
-    },
-    isAdmin: (state) => {
-      console.log('Checking admin status, userInfo:', state.userInfo)
-      return state.userInfo?.role === 'admin'
-    },
-    isCaptain: (state) => state.userInfo?.role === 'captain'
-  },
+// å®šä¹‰ç™»å½•å“åº”æŽ¥å£
+interface LoginResponse {
+  token: string
+  user: UserInfo
+}
 
-  actions: {
-    async register(userData: any) {
-      try {
-        const res = await request.post('/auth/register', userData)
-        if (res.data?.msg === 'User created successfully') {
-          ElMessage.success('×¢²á³É¹¦')
-          return res
-        }
-        throw new Error(res.data?.msg || '×¢²áÊ§°Ü')
-      } catch (error: any) {
-        ElMessage.error(error.response?.data?.msg || error.message || '×¢²áÊ§°Ü')
-        throw error
+export const useUserStore = defineStore('user', () => {
+  const token = ref<string | null>(localStorage.getItem('token'))
+  const userInfo = ref<UserInfo | null>(null)
+  
+  // è®¡ç®—å±žæ€§ï¼šåˆ¤æ–­æ˜¯å¦ä¸ºç®¡ç†å‘˜
+  const isAdmin = computed(() => {
+    return userInfo.value?.role === 'admin'
+  })
+
+  // èŽ·å–token - ç›´æŽ¥ä»Ž localStorage èŽ·å–ï¼Œè¿™æ˜¯æœ€å¯é çš„åŒæ­¥æ–¹å¼
+  const getToken = () => {
+    return localStorage.getItem('token')
+  }
+
+  // è®¾ç½®token
+  const setToken = (newToken: string) => {
+    const cleanToken = newToken.startsWith('Bearer ') ? newToken.substring(7) : newToken;
+    token.value = cleanToken
+    localStorage.setItem('token', cleanToken)
+  }
+
+  // æ¸…é™¤token
+  const clearToken = () => {
+    token.value = null
+    userInfo.value = null
+    localStorage.removeItem('token')
+  }
+
+  // ç™»å½•
+  const login = async (username: string, password: string) => {
+    try {
+      const response = await request.post<LoginResponse>('/auth/login', { username, password })
+      if (response.code === 200 && response.data?.token) {
+        setToken(response.data.token)
+        return response
       }
-    },
-
-    async login(username: string, password: string) {
-      try {
-        const res = await request.post('/auth/login', { username, password })
-        if (res.data?.data?.token) {
-          const token = res.data.data.token
-          console.log('Setting token:', token)
-          this.token = token
-          localStorage.setItem('token', token)
-          
-          if (res.data.data.user) {
-            console.log('Setting user info:', res.data.data.user)
-            this.userInfo = res.data.data.user
-          }
-          return res
-        }
-        throw new Error(res.data?.msg || 'µÇÂ¼Ê§°Ü')
-      } catch (error: any) {
-        console.error('Login error:', error)
-        ElMessage.error(error.response?.data?.msg || error.message || 'µÇÂ¼Ê§°Ü')
-        throw error
-      }
-    },
-
-    async getUserInfo() {
-      if (this.userInfo) {
-        console.log('Using cached user info:', this.userInfo)
-        return this.userInfo
-      }
-
-      try {
-        if (!this.token) {
-          console.warn('No token available for getUserInfo')
-          throw new Error('Î´µÇÂ¼')
-        }
-
-        console.log('Fetching user info with token:', this.token)
-        const res = await request.get('/users/profile')
-        
-        if (res.data?.data) {
-          console.log('Received user info:', res.data.data)
-          this.userInfo = res.data.data
-          return this.userInfo
-        }
-        throw new Error('»ñÈ¡ÓÃ»§ÐÅÏ¢Ê§°Ü')
-      } catch (error: any) {
-        console.error('»ñÈ¡ÓÃ»§ÐÅÏ¢Ê§°Ü:', error)
-        if (error.response?.status === 401) {
-          console.log('Token expired, logging out')
-          this.logout()
-          ElMessage.error('µÇÂ¼ÒÑ¹ýÆÚ£¬ÇëÖØÐÂµÇÂ¼')
-        } else {
-          ElMessage.error(error.response?.data?.msg || error.message || '»ñÈ¡ÓÃ»§ÐÅÏ¢Ê§°Ü')
-        }
-        throw error
-      }
-    },
-
-    async updateProfile(data: any) {
-      try {
-        const res = await request.put('/users/profile', data)
-        if (res.data?.data) {
-          this.userInfo = { ...this.userInfo, ...res.data.data }
-          return this.userInfo
-        }
-        throw new Error('¸üÐÂÓÃ»§ÐÅÏ¢Ê§°Ü')
-      } catch (error: any) {
-        ElMessage.error(error.response?.data?.msg || error.message || '¸üÐÂÓÃ»§ÐÅÏ¢Ê§°Ü')
-        throw error
-      }
-    },
-
-    logout() {
-      console.log('Logging out, clearing token and user info')
-      this.token = ''
-      this.userInfo = null
-      localStorage.removeItem('token')
-      router.push('/login')
+      throw new Error(response.msg || 'ç™»å½•å¤±è´¥')
+    } catch (error: any) {
+      console.error('Login error:', error)
+      clearToken()
+      throw new Error(error?.response?.data?.msg || error?.message || 'ç™»å½•å¤±è´¥')
     }
+  }
+
+  // æ³¨å†Œ
+  const register = async (userData: {
+    username: string
+    password: string
+    name: string
+    student_id: string
+    college: string
+    phone_number: string
+    role?: string
+  }) => {
+    try {
+      const response = await request.post('/auth/register', userData)
+      if (response.code === 200 || response.code === 201) {
+        return response
+      }
+      throw new Error(response.msg || 'æ³¨å†Œå¤±è´¥')
+    } catch (error: any) {
+      console.error('Registration error:', error)
+      throw error
+    }
+  }
+
+  // èŽ·å–ç”¨æˆ·ä¿¡æ¯
+  const getUserInfo = async () => {
+    try {
+      const response = await request.get<UserInfo>('/auth/info')
+      if (response.code === 200 && response.data) {
+        userInfo.value = response.data
+        return response.data
+      }
+      throw new Error(response.msg || 'èŽ·å–ç”¨æˆ·ä¿¡æ¯å¤±è´¥')
+    } catch (error: any) {
+      console.error('Get user info error:', error)
+      throw error
+    }
+  }
+
+  // é€€å‡ºç™»å½•
+  const logout = () => {
+    clearToken()
+    window.location.href = '/login'
+  }
+
+  // åˆå§‹åŒ–store
+  const initStore = async () => {
+    const token = getToken()
+    if (token && !userInfo.value) {
+      await getUserInfo()
+    }
+  }
+
+  return {
+    token,
+    userInfo,
+    isAdmin,
+    getToken,
+    setToken,
+    clearToken,
+    login,
+    register,
+    getUserInfo,
+    logout,
+    initStore,
   }
 }) 

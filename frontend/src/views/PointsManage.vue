@@ -75,6 +75,14 @@
         <div class="card-header">
           <h3>调整历史</h3>
           <div class="filter-group">
+            <el-input
+              v-model="searchQuery"
+              placeholder="按用户名/姓名/学号搜索"
+              clearable
+              @clear="fetchHistory"
+              @keyup.enter="fetchHistory"
+              style="width: 240px; margin-right: 10px;"
+            />
             <el-select v-model="filterType" placeholder="选择类型" clearable @change="fetchHistory">
               <el-option label="升降旗" value="flag" />
               <el-option label="训练" value="training" />
@@ -131,11 +139,18 @@ import { ref, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import request from '../utils/request'
+import { formatDateTime } from '../utils/format'
+
+interface UserOption {
+  user_id: number
+  name: string
+  student_id: string
+}
 
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
 const loading = ref(false)
-const userOptions = ref([])
+const userOptions = ref<UserOption[]>([])
 
 // 表单数据
 const adjustForm = ref({
@@ -168,23 +183,56 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const filterType = ref('')
+const searchQuery = ref('')
 
 // 搜索用户
 const searchUsers = async (query: string) => {
   if (query) {
     loading.value = true
     try {
-      const response = await request.get('/users/search', {
+      const { data: responseData } = await request.get('/users/search', {
         params: { query }
       })
-      userOptions.value = response.data
+      console.log('Search response:', responseData)
+      if (responseData) {
+        userOptions.value = responseData
+      } else {
+        userOptions.value = []
+      }
     } catch (error) {
+      console.error('Search users error:', error)
       ElMessage.error('搜索用户失败')
+      userOptions.value = []
     } finally {
       loading.value = false
     }
   } else {
     userOptions.value = []
+  }
+}
+
+// 获取积分调整历史记录
+const fetchHistory = async () => {
+  try {
+    const { data: responseData } = await request.get('/points/history/all', {
+      params: {
+        page: currentPage.value,
+        per_page: pageSize.value,
+        type: filterType.value || undefined,
+        query: searchQuery.value || undefined
+      }
+    })
+    console.log('History response:', responseData)
+    if (responseData && responseData.items) {
+      history.value = responseData.items
+      total.value = responseData.total
+    } else {
+      console.error('Invalid response format:', responseData)
+      ElMessage.error('获取历史记录失败：响应格式错误')
+    }
+  } catch (error: any) {
+    console.error('Error fetching history:', error)
+    ElMessage.error(error.response?.data?.msg || '获取历史记录失败')
   }
 }
 
@@ -206,31 +254,15 @@ const submitAdjustment = async () => {
           description: ''
         }
         // 刷新历史记录
-        fetchHistory()
-      } catch (error) {
-        ElMessage.error('提交失败')
+        await fetchHistory()
+      } catch (error: any) {
+        console.error('Error submitting adjustment:', error)
+        ElMessage.error(error.response?.data?.msg || '积分调整失败')
       } finally {
         submitting.value = false
       }
     }
   })
-}
-
-// 获取历史记录
-const fetchHistory = async () => {
-  try {
-    const response = await request.get('/points/history/all', {
-      params: {
-        page: currentPage.value,
-        per_page: pageSize.value,
-        type: filterType.value || undefined
-      }
-    })
-    history.value = response.data.items
-    total.value = response.data.total
-  } catch (error) {
-    ElMessage.error('获取历史记录失败')
-  }
 }
 
 // 分页处理
@@ -244,18 +276,14 @@ const handleCurrentChange = (val: number) => {
   fetchHistory()
 }
 
-// 格式化日期时间
-const formatDateTime = (dateStr: string) => {
-  return new Date(dateStr).toLocaleString()
-}
-
 // 获取变动类型文本
 const getChangeTypeText = (type: string) => {
   const typeMap: Record<string, string> = {
     flag: '升降旗',
     training: '训练',
     event: '活动',
-    other: '其他'
+    other: '其他',
+    training_award: '训练'
   }
   return typeMap[type] || type
 }

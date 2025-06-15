@@ -6,6 +6,7 @@
         <el-input
           v-model="searchQuery"
           placeholder="搜索用户（用户名/姓名/学号）"
+          aria-label="搜索用户"
           class="search-input"
           @input="handleSearch"
         />
@@ -108,7 +109,18 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
 import type { FormInstance } from 'element-plus'
 
-const users = ref([])
+interface User {
+  user_id: number
+  username: string
+  name: string
+  student_id: string
+  college: string
+  role: string
+  total_points: number
+  phone_number: string
+}
+
+const users = ref<User[]>([])
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(10)
@@ -150,9 +162,9 @@ const fetchUsers = async () => {
       }
     })
     
-    if (response.data?.data) {
-      users.value = response.data.data.items
-      total.value = response.data.data.total
+    if (response.data?.items) {
+      users.value = response.data.items
+      total.value = response.data.total
     }
   } catch (error: any) {
     ElMessage.error(error.response?.data?.msg || '获取用户列表失败')
@@ -233,23 +245,28 @@ const handleSubmit = async () => {
 
   try {
     await formRef.value.validate()
-    const response = await request.put(`/users/${form.value.id}`, {
-      name: form.value.name,
-      student_id: form.value.student_id,
-      college: form.value.college,
-      phone_number: form.value.phone_number,
-      role: form.value.role
-    })
-
-    if (response.data?.msg === '用户信息更新成功') {
-      ElMessage.success('用户信息更新成功')
-      dialogVisible.value = false
-      fetchUsers()
-    } else {
-      ElMessage.error(response.data?.msg || '更新失败')
+    
+    // 如果角色发生变化，使用专门的接口更新角色
+    if (form.value.role !== users.value.find(u => u.user_id === form.value.id)?.role) {
+      await request.put(`/users/${form.value.id}/role`, { role: form.value.role })
     }
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.msg || '更新失败')
+
+    // 更新其他信息
+    const { username, name, student_id, college, phone_number, password } = form.value
+    const payload = { username, name, student_id, college, phone_number, password }
+    const response = await request.put(`/users/${form.value.id}`, payload)
+
+    if (response.code === 200) {
+      ElMessage.success('更新成功')
+    } else {
+      ElMessage.error(response.msg || '更新失败')
+    }
+
+    dialogVisible.value = false
+    fetchUsers()
+  } catch (error) {
+    console.error('Submit error:', error)
+    ElMessage.error('操作失败')
   }
 }
 

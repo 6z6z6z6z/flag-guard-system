@@ -4,6 +4,7 @@ from flask.cli import with_appcontext
 from extensions import db
 from models import User, FlagRecord, Training, Event, PointHistory
 from datetime import datetime, timedelta
+from sqlalchemy import text
 import logging
 import json
 import os
@@ -153,13 +154,24 @@ def backup_db(backup_path):
         # 确保备份目录存在
         os.makedirs(os.path.dirname(backup_path), exist_ok=True)
         
-        # 复制数据库文件
-        if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
-            db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-            shutil.copy2(db_path, backup_path)
-            click.echo(f'数据库已备份到 {backup_path}')
+        # 获取数据库连接信息
+        db_url = app.config['SQLALCHEMY_DATABASE_URI']
+        if db_url.startswith('mysql'):
+            # 从连接字符串中提取数据库信息
+            from urllib.parse import urlparse
+            parsed = urlparse(db_url)
+            db_name = parsed.path[1:]  # 去掉开头的斜杠
+            user = parsed.username
+            password = parsed.password
+            host = parsed.hostname
+            
+            # 使用 mysqldump 命令备份
+            import subprocess
+            cmd = f'mysqldump -h {host} -u {user} -p{password} {db_name} > {backup_path}'
+            subprocess.run(cmd, shell=True, check=True)
+            click.echo(f'MySQL数据库已备份到 {backup_path}')
         else:
-            click.echo('目前只支持 SQLite 数据库的备份')
+            click.echo('目前只支持 MySQL 数据库的备份')
     except Exception as e:
         click.echo(f'备份数据库失败: {str(e)}')
 
@@ -169,7 +181,7 @@ def check_system():
     """检查系统状态"""
     try:
         # 检查数据库连接
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         click.echo('数据库连接正常')
         
         # 检查用户数量
@@ -179,6 +191,12 @@ def check_system():
         # 检查管理员数量
         admin_count = User.query.filter_by(role='admin').count()
         click.echo(f'系统中共有 {admin_count} 个管理员')
+        
+        # 检查活动和训练数量
+        event_count = Event.query.count()
+        click.echo(f'系统中共有 {event_count} 个活动')
+        training_count = Training.query.count()
+        click.echo(f'系统中共有 {training_count} 个训练')
         
         # 检查最近的记录
         recent_flags = FlagRecord.query.order_by(FlagRecord.created_at.desc()).limit(5).all()
@@ -239,3 +257,15 @@ def export_data(export_path, format):
         click.echo(f'数据已导出到 {export_path}')
     except Exception as e:
         click.echo(f'导出数据失败: {str(e)}')
+
+def init_cli(app):
+    """注册所有CLI命令"""
+    app.cli.add_command(init_db)
+    app.cli.add_command(drop_db)
+    app.cli.add_command(create_admin)
+    app.cli.add_command(list_users)
+    app.cli.add_command(cleanup_records)
+    app.cli.add_command(backup_db)
+    app.cli.add_command(check_system)
+    app.cli.add_command(reset_password)
+    app.cli.add_command(export_data)

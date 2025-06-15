@@ -1,12 +1,20 @@
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import User, PointHistory
 from extensions import db
+from sqlalchemy import or_, func
+from utils.route_utils import (
+    APIResponse, validate_required_fields, validate_student_id,
+    validate_phone_number, handle_exceptions, validate_json_request,
+    log_operation, role_required
+)
 
 users_bp = Blueprint('users', __name__)
 
 @users_bp.route('/profile', methods=['GET'])
 @jwt_required()
+@handle_exceptions
+@log_operation('get_profile')
 def get_profile():
     """
     获取用户个人信息
@@ -21,48 +29,34 @@ def get_profile():
       404:
         description: 用户不存在
     """
-    try:
-        # 获取JWT中的用户ID
-        user_id = get_jwt_identity()
-        current_app.logger.info(f"Getting profile for user_id: {user_id}")
-        
-        if not user_id:
-            current_app.logger.warning("No user_id found in JWT token")
-            return jsonify({"msg": "Invalid token"}), 401
-        
-        # 查询用户
-        user = User.query.get(user_id)
-        
-        if not user:
-            current_app.logger.warning(f"User not found for user_id: {user_id}")
-            return jsonify({"msg": "User not found"}), 404
-        
-        # 返回用户信息
-        user_data = {
-            "username": user.username,
-            "name": user.name,
-            "student_id": user.student_id,
-            "college": user.college,
-            "height": user.height,
-            "weight": user.weight,
-            "shoe_size": user.shoe_size,
-            "total_points": user.total_points,
-            "role": user.role,
-            "phone_number": user.phone_number
-        }
-        
-        current_app.logger.info(f"Successfully retrieved profile for user: {user.username}")
-        return jsonify({
-            "msg": "success",
-            "data": user_data
-        }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f"Error getting user profile: {str(e)}")
-        return jsonify({"msg": str(e)}), 500
+    user_id = get_jwt_identity()
+    current_app.logger.info(f"Getting profile for user_id: {user_id}")
+    
+    user = User.query.get(user_id)
+    if not user:
+        return APIResponse.error("User not found", 404)
+    
+    user_data = {
+        "username": user.username,
+        "name": user.name,
+        "student_id": user.student_id,
+        "college": user.college,
+        "height": user.height,
+        "weight": user.weight,
+        "shoe_size": user.shoe_size,
+        "total_points": user.total_points,
+        "role": user.role,
+        "phone_number": user.phone_number
+    }
+    
+    current_app.logger.info(f"Successfully retrieved profile for user: {user.username}")
+    return APIResponse.success(data=user_data)
 
 @users_bp.route('/profile', methods=['PUT'])
 @jwt_required()
+@validate_json_request
+@handle_exceptions
+@log_operation('update_profile')
 def update_profile():
     """
     更新用户个人信息
@@ -92,36 +86,31 @@ def update_profile():
       404:
         description: 用户不存在
     """
-    try:
-        user_id = get_jwt_identity()
-        user = User.query.get(user_id)
-        
-        if not user:
-            return jsonify({"msg": "User not found"}), 404
-        
-        data = request.get_json()
-        
-        # 只允许更新特定字段
-        allowed_fields = {'height', 'weight', 'shoe_size'}
-        for field in allowed_fields:
-            if field in data:
-                setattr(user, field, data[field])
-        
-        db.session.commit()
-        return jsonify({
-            "msg": "success",
-            "data": {
-                "height": user.height,
-                "weight": user.weight,
-                "shoe_size": user.shoe_size
-            }
-        }), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"msg": str(e)}), 500
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    
+    if not user:
+        return APIResponse.error("User not found", 404)
+    
+    data = request.get_json()
+    
+    # 只允许更新特定字段
+    allowed_fields = {'height', 'weight', 'shoe_size'}
+    for field in allowed_fields:
+        if field in data:
+            setattr(user, field, data[field])
+    
+    db.session.commit()
+    return APIResponse.success(data={
+        "height": user.height,
+        "weight": user.weight,
+        "shoe_size": user.shoe_size
+    })
 
 @users_bp.route('/points/history', methods=['GET'])
 @jwt_required()
+@handle_exceptions
+@log_operation('get_points_history')
 def get_points_history():
     """
     获取用户积分历史
@@ -145,35 +134,31 @@ def get_points_history():
       404:
         description: 用户不存在
     """
-    try:
-        user_id = get_jwt_identity()
-        user = User.query.get(user_id)
-        
-        if not user:
-            return jsonify({"msg": "User not found"}), 404
-        
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        
-        # 获取分页的积分历史记录
-        pagination = PointHistory.query.filter_by(user_id=user_id)\
-            .order_by(PointHistory.change_time.desc())\
-            .paginate(page=page, per_page=per_page)
-        
-        return jsonify({
-            "msg": "success",
-            "data": {
-                "items": [item.to_dict() for item in pagination.items],
-                "total": pagination.total,
-                "pages": pagination.pages,
-                "current_page": page
-            }
-        }), 200
-    except Exception as e:
-        return jsonify({"msg": str(e)}), 500
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    
+    if not user:
+        return APIResponse.error("User not found", 404)
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    # 获取分页的积分历史记录
+    pagination = PointHistory.query.filter_by(user_id=user_id)\
+        .order_by(PointHistory.change_time.desc())\
+        .paginate(page=page, per_page=per_page)
+    
+    return APIResponse.success(data={
+        "items": [item.to_dict() for item in pagination.items],
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": page
+    })
 
 @users_bp.route('/search', methods=['GET'])
 @jwt_required()
+@handle_exceptions
+@log_operation('search_users')
 def search_users():
     """
     搜索用户
@@ -192,25 +177,28 @@ def search_users():
       200:
         description: 成功获取用户列表
     """
-    try:
-        query = request.args.get('query', '')
-        if not query:
-            return jsonify([]), 200
-            
-        # 搜索用户名、姓名或学号包含关键词的用户
-        users = User.query.filter(
-            (User.username.ilike(f'%{query}%')) |
-            (User.name.ilike(f'%{query}%')) |
-            (User.student_id.ilike(f'%{query}%'))
-        ).limit(10).all()
+    query = request.args.get('query', '')
+    if not query:
+        return APIResponse.success(data=[])
         
-        return jsonify([user.to_dict() for user in users]), 200
-    except Exception as e:
-        current_app.logger.error(f"Error searching users: {str(e)}")
-        return jsonify({"msg": str(e)}), 500
+    search_term = f'%{query.lower()}%'
+    
+    # 搜索用户名、姓名或学号包含关键词的用户
+    users = User.query.filter(
+        or_(
+            func.lower(User.username).like(search_term),
+            func.lower(User.name).like(search_term),
+            func.lower(User.student_id).like(search_term)
+        )
+    ).limit(10).all()
+    
+    return APIResponse.success(data=[user.to_dict() for user in users])
 
 @users_bp.route('/points/all', methods=['GET'])
 @jwt_required()
+@role_required('admin')
+@handle_exceptions
+@log_operation('get_all_users_points')
 def get_all_users_points():
     """
     获取所有用户的积分（仅管理员）
@@ -238,59 +226,36 @@ def get_all_users_points():
       403:
         description: 权限不足
     """
-    try:
-        # 获取当前用户
-        user_id = get_jwt_identity()
-        current_user = User.query.get(user_id)
-        
-        if not current_user or current_user.role != 'admin':
-            return jsonify({"msg": "权限不足"}), 403
-            
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        query = request.args.get('query', '')
-        
-        # 构建查询
-        user_query = User.query
-        
-        # 如果有搜索关键词，添加搜索条件
-        if query:
-            user_query = user_query.filter(
-                (User.username.ilike(f'%{query}%')) |
-                (User.name.ilike(f'%{query}%')) |
-                (User.student_id.ilike(f'%{query}%'))
-            )
-        
-        # 按积分降序排序
-        user_query = user_query.order_by(User.total_points.desc())
-        
-        # 分页
-        pagination = user_query.paginate(page=page, per_page=per_page)
-        
-        return jsonify({
-            "msg": "success",
-            "data": {
-                "items": [{
-                    "user_id": user.user_id,
-                    "username": user.username,
-                    "name": user.name,
-                    "student_id": user.student_id,
-                    "college": user.college,
-                    "total_points": user.total_points,
-                    "phone_number": user.phone_number,
-                    "role": user.role
-                } for user in pagination.items],
-                "total": pagination.total,
-                "pages": pagination.pages,
-                "current_page": page
-            }
-        }), 200
-    except Exception as e:
-        current_app.logger.error(f"Error getting all users points: {str(e)}")
-        return jsonify({"msg": str(e)}), 500
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    query = request.args.get('query', '')
+    
+    # 构建查询
+    user_query = User.query
+    if query:
+        user_query = user_query.filter(
+            (User.username.ilike(f'%{query}%')) |
+            (User.name.ilike(f'%{query}%')) |
+            (User.student_id.ilike(f'%{query}%'))
+        )
+    
+    # 分页查询
+    pagination = user_query.order_by(User.total_points.desc())\
+        .paginate(page=page, per_page=per_page)
+    
+    return APIResponse.success(data={
+        "items": [user.to_dict() for user in pagination.items],
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": page
+    })
 
 @users_bp.route('', methods=['POST'])
 @jwt_required()
+@role_required('admin')
+@validate_json_request
+@handle_exceptions
+@log_operation('create_user')
 def create_user():
     """
     创建新用户（仅管理员）
@@ -318,8 +283,9 @@ def create_user():
               type: string
             role:
               type: string
-              enum: [admin, user]
-              default: user
+              enum: [admin, member]
+            phone_number:
+              type: string
     responses:
       201:
         description: 用户创建成功
@@ -328,66 +294,67 @@ def create_user():
       403:
         description: 权限不足
     """
+    data = request.get_json()
+    
+    # 验证必填字段
+    required_fields = ['username', 'password', 'name', 'student_id', 'college']
+    is_valid, error_msg = validate_required_fields(data, required_fields)
+    if not is_valid:
+        return APIResponse.error(error_msg, 400)
+    
+    # 验证学号格式
+    is_valid, error_msg = validate_student_id(data['student_id'])
+    if not is_valid:
+        return APIResponse.error(error_msg, 400)
+    
+    # 验证手机号格式
+    if data.get('phone_number'):
+        is_valid, error_msg = validate_phone_number(data['phone_number'])
+        if not is_valid:
+            return APIResponse.error(error_msg, 400)
+    
+    # 检查用户名是否已存在
+    if User.query.filter_by(username=data['username']).first():
+        return APIResponse.error("Username already exists", 400)
+    
+    # 检查学号是否已存在
+    if User.query.filter_by(student_id=data['student_id']).first():
+        return APIResponse.error("Student ID already exists", 400)
+    
     try:
-        # 检查当前用户是否为管理员
-        user_id = get_jwt_identity()
-        current_user = User.query.get(user_id)
-        
-        if not current_user or current_user.role != 'admin':
-            return jsonify({"msg": "权限不足"}), 403
-            
-        data = request.get_json()
-        
-        # 验证必填字段
-        required_fields = ['username', 'password', 'name', 'student_id', 'college']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({"msg": f"Missing required field: {field}"}), 400
-                
-        # 检查用户名是否已存在
-        if User.query.filter_by(username=data['username']).first():
-            return jsonify({"msg": "Username already exists"}), 400
-            
-        # 检查学号是否已存在
-        if User.query.filter_by(student_id=data['student_id']).first():
-            return jsonify({"msg": "Student ID already exists"}), 400
-            
-        # 创建新用户
         user = User(
             username=data['username'],
             name=data['name'],
             student_id=data['student_id'],
             college=data['college'],
-            role=data.get('role', 'user'),
+            role=data.get('role', 'member'),
             phone_number=data.get('phone_number')
         )
-        user.set_password(data['password'])
+        if not user.set_password(data['password']):
+            return APIResponse.error("Failed to set password", 500)
         
         db.session.add(user)
         db.session.commit()
         
-        return jsonify({
-            "msg": "success",
-            "data": {
-                "user_id": user.user_id,
-                "username": user.username,
-                "name": user.name,
-                "student_id": user.student_id,
-                "college": user.college,
-                "role": user.role
-            }
-        }), 201
-        
+        return APIResponse.success(
+            data=user.to_dict(),
+            msg="User created successfully",
+            code=201
+        )
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error creating user: {str(e)}")
-        return jsonify({"msg": str(e)}), 500
+        return APIResponse.error("Error creating user", 500)
 
 @users_bp.route('/<int:user_id>/role', methods=['PUT'])
 @jwt_required()
+@role_required('admin')
+@validate_json_request
+@handle_exceptions
+@log_operation('update_user_role')
 def update_user_role(user_id):
     """
-    更新用户角色
+    更新用户角色（仅管理员）
     ---
     tags:
       - 用户
@@ -398,7 +365,6 @@ def update_user_role(user_id):
         in: path
         type: integer
         required: true
-        description: 用户ID
       - name: body
         in: body
         required: true
@@ -407,10 +373,10 @@ def update_user_role(user_id):
           properties:
             role:
               type: string
-              enum: ["admin", "member"]
+              enum: [admin, member]
     responses:
       200:
-        description: 更新成功
+        description: 角色更新成功
       400:
         description: 参数错误
       403:
@@ -418,37 +384,36 @@ def update_user_role(user_id):
       404:
         description: 用户不存在
     """
+    data = request.get_json()
+    
+    if 'role' not in data:
+        return APIResponse.error("Role is required", 400)
+    
+    if data['role'] not in ['admin', 'member']:
+        return APIResponse.error("Invalid role", 400)
+    
+    user = User.query.get(user_id)
+    if not user:
+        return APIResponse.error("User not found", 404)
+    
     try:
-        current_user_id = get_jwt_identity()
-        current_user = User.query.get(current_user_id)
-
-        if not current_user or current_user.role != 'admin':
-            return jsonify({"msg": "权限不足"}), 403
-
-        user = User.query.get(user_id)
-
-        if not user:
-            return jsonify({"msg": "用户不存在"}), 404
-
-        data = request.get_json()
-        new_role = data.get('role')
-
-        if new_role not in ['admin', 'member']:
-            return jsonify({"msg": "无效的角色"}), 400
-
-        user.role = new_role
+        user.role = data['role']
         db.session.commit()
-
-        return jsonify({"msg": "角色更新成功"}), 200
+        return APIResponse.success(data=user.to_dict())
     except Exception as e:
         db.session.rollback()
-        return jsonify({"msg": str(e)}), 500
+        current_app.logger.error(f"Error updating user role: {str(e)}")
+        return APIResponse.error("Error updating user role", 500)
 
 @users_bp.route('/<int:user_id>', methods=['PUT'])
 @jwt_required()
+@role_required('admin')
+@validate_json_request
+@handle_exceptions
+@log_operation('update_user')
 def update_user(user_id):
     """
-    更新用户信息
+    更新用户信息（仅管理员）
     ---
     tags:
       - 用户
@@ -459,7 +424,6 @@ def update_user(user_id):
         in: path
         type: integer
         required: true
-        description: 用户ID
       - name: body
         in: body
         required: true
@@ -468,15 +432,10 @@ def update_user(user_id):
           properties:
             name:
               type: string
-            student_id:
-              type: string
             college:
               type: string
             phone_number:
               type: string
-            role:
-              type: string
-              enum: ["admin", "member"]
     responses:
       200:
         description: 更新成功
@@ -487,30 +446,28 @@ def update_user(user_id):
       404:
         description: 用户不存在
     """
+    data = request.get_json()
+    user = User.query.get(user_id)
+    
+    if not user:
+        return APIResponse.error("User not found", 404)
+    
+    # 验证手机号格式
+    if data.get('phone_number'):
+        is_valid, error_msg = validate_phone_number(data['phone_number'])
+        if not is_valid:
+            return APIResponse.error(error_msg, 400)
+    
     try:
-        current_user_id = get_jwt_identity()
-        current_user = User.query.get(current_user_id)
-
-        if not current_user or current_user.role != 'admin':
-            return jsonify({"msg": "权限不足"}), 403
-
-        user = User.query.get(user_id)
-
-        if not user:
-            return jsonify({"msg": "用户不存在"}), 404
-
-        data = request.get_json()
-
-        # 更新用户信息
-        user.name = data.get('name', user.name)
-        user.student_id = data.get('student_id', user.student_id)
-        user.college = data.get('college', user.college)
-        user.phone_number = data.get('phone_number', user.phone_number)
-        user.role = data.get('role', user.role)
-
+        # 更新允许的字段
+        allowed_fields = {'name', 'college', 'phone_number'}
+        for field in allowed_fields:
+            if field in data:
+                setattr(user, field, data[field])
+        
         db.session.commit()
-
-        return jsonify({"msg": "用户信息更新成功"}), 200
+        return APIResponse.success(data=user.to_dict())
     except Exception as e:
         db.session.rollback()
-        return jsonify({"msg": str(e)}), 500 
+        current_app.logger.error(f"Error updating user: {str(e)}")
+        return APIResponse.error("Error updating user", 500) 

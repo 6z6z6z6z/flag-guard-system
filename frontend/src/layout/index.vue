@@ -2,8 +2,11 @@
   <el-container class="layout-container">
     <el-aside :width="isCollapse ? '64px' : '200px'">
       <div class="logo">
-        <img src="../assets/logo.png" alt="Logo" />
-        <span v-show="!isCollapse">升旗管理系统</span>
+        <img src="/logo.png" alt="系统Logo" />
+        <div v-show="!isCollapse" class="logo-text">
+          <p>中国科学技术大学</p>
+          <p>校学生国旗护卫队</p>
+        </div>
       </div>
       <el-menu
         :default-active="$route.path"
@@ -25,7 +28,7 @@
         </el-menu-item>
         <el-menu-item index="/flag-records">
           <el-icon><Document /></el-icon>
-          <template #title>升旗记录</template>
+          <template #title>升降旗记录</template>
         </el-menu-item>
         <el-menu-item index="/points">
           <el-icon><Star /></el-icon>
@@ -143,5 +146,41 @@ const handleCommand = (command: string) => {
 .el-main {
   background-color: #f0f2f5;
   padding: 20px;
+}
+
+.logo {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0 15px;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.logo img {
+  max-height: 40px;
+  max-width: 40px;
+  margin-right: 10px;
+}
+
+.logo-text {
+  color: white;
+  line-height: 1.3;
+  font-family: "Microsoft YaHei", "微软雅黑", "SimHei", "黑体", sans-serif;
+}
+
+.logo-text p {
+  margin: 0;
+  font-weight: 600;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.logo-text p:first-child {
+  font-size: 15px;
+}
+
+.logo-text p:last-child {
+  font-size: 13px;
 }
 </style> 

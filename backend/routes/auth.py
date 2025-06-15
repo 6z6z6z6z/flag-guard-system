@@ -1,12 +1,19 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models import User
-from extensions import db, jwt
-from functools import wraps
+from extensions import db
+from utils.route_utils import (
+    APIResponse, validate_required_fields, validate_student_id,
+    validate_phone_number, handle_exceptions, validate_json_request,
+    log_operation
+)
 
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/register', methods=['POST'])
+@validate_json_request
+@handle_exceptions
+@log_operation('user_registration')
 def register():
     """
     用户注册
@@ -43,64 +50,62 @@ def register():
       400:
         description: 用户名已存在
     """
+    data = request.get_json()
+    current_app.logger.info(f"Registration attempt received: {data.get('username')}")
+    
+    # 验证必填字段
+    required_fields = ['username', 'password', 'name', 'student_id', 'college']
+    is_valid, error_msg = validate_required_fields(data, required_fields)
+    if not is_valid:
+        return APIResponse.error(error_msg, 400)
+    
+    # 验证学号格式
+    is_valid, error_msg = validate_student_id(data['student_id'])
+    if not is_valid:
+        return APIResponse.error(error_msg, 400)
+    
+    # 验证手机号格式
+    if data.get('phone_number'):
+        is_valid, error_msg = validate_phone_number(data['phone_number'])
+        if not is_valid:
+            return APIResponse.error(error_msg, 400)
+    
+    # 检查用户名是否已存在
+    if User.query.filter_by(username=data['username']).first():
+        return APIResponse.error("Username already exists", 400)
+    
+    # 检查学号是否已存在
+    if User.query.filter_by(student_id=data['student_id']).first():
+        return APIResponse.error("Student ID already exists", 400)
+    
     try:
-        data = request.get_json()
-        current_app.logger.info(f"Registration attempt received: {data.get('username')}")
+        user = User(
+            username=data['username'],
+            name=data['name'],
+            student_id=data['student_id'],
+            college=data['college'],
+            role=data.get('role', 'member'),
+            phone_number=data.get('phone_number')
+        )
+        if not user.set_password(data['password']):
+            return APIResponse.error("Failed to set password", 500)
         
-        if not data:
-            current_app.logger.warning("Registration attempt with no data")
-            return jsonify({"msg": "No input data provided"}), 400
-            
-        # 验证必填字段
-        required_fields = ['username', 'password', 'name', 'student_id', 'college']
-        for field in required_fields:
-            if not data.get(field):
-                current_app.logger.warning(f"Registration attempt missing required field: {field}")
-                return jsonify({"msg": f"Missing required field: {field}"}), 400
-            
-        # 验证学号格式
-        if not User.validate_student_id(data['student_id']):
-            current_app.logger.warning(f"Registration attempt with invalid student ID format: {data['student_id']}")
-            return jsonify({"msg": "Invalid student ID format. It must be 2 uppercase letters followed by 8 digits."}), 400
-            
-        # 检查用户名是否已存在
-        if User.query.filter_by(username=data['username']).first():
-            current_app.logger.warning(f"Registration attempt failed: Username {data['username']} already exists")
-            return jsonify({"msg": "Username already exists"}), 400
-            
-        # 检查学号是否已存在
-        if User.query.filter_by(student_id=data['student_id']).first():
-            current_app.logger.warning(f"Registration attempt failed: Student ID {data['student_id']} already exists")
-            return jsonify({"msg": "Student ID already exists"}), 400
+        db.session.add(user)
+        db.session.commit()
+        current_app.logger.info(f"User {user.username} registered successfully")
         
-        try:
-            user = User(
-                username=data['username'],
-                name=data['name'],
-                student_id=data['student_id'],
-                college=data['college'],
-                role=data.get('role', 'member'),  # 如果未指定角色，默认为队员
-                phone_number=data.get('phone_number')
-            )
-            if not user.set_password(data['password']):
-                raise Exception("Failed to set password")
-                
-            db.session.add(user)
-            db.session.commit()
-            current_app.logger.info(f"User {user.username} registered successfully")
-            
-            return jsonify({"msg": "User created successfully"}), 201
-            
-        except Exception as db_error:
-            current_app.logger.error(f"Database error during registration: {str(db_error)}")
-            db.session.rollback()
-            return jsonify({"msg": "Error creating user"}), 500
-            
-    except Exception as e:
-        current_app.logger.error(f"Registration error: {str(e)}")
-        return jsonify({"msg": "Internal server error"}), 500
+        # 直接返回成功信息，不生成 token
+        return APIResponse.success(msg="User created successfully", code=201)
+        
+    except Exception as db_error:
+        current_app.logger.error(f"Database error during registration: {str(db_error)}")
+        db.session.rollback()
+        return APIResponse.error(str(db_error), 500)
 
 @auth_bp.route('/login', methods=['POST'])
+@validate_json_request
+@handle_exceptions
+@log_operation('user_login')
 def login():
     """
     用户登录
@@ -122,69 +127,56 @@ def login():
       200:
         description: 登录成功
       401:
-        description: 认证失败
+        description: 用户名或密码错误
     """
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    
+    current_app.logger.info(f"Login attempt received for username: {username}")
+    
+    # 验证必填字段
+    if not username or not password:
+        current_app.logger.warning("Login attempt failed: Missing username or password")
+        return APIResponse.error("Username and password are required", 400)
+    
+    # 查找用户
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        current_app.logger.warning(f"Login attempt failed: User not found - {username}")
+        return APIResponse.error("Invalid username or password", 401)
+    
+    # 验证密码
+    if not user.check_password(password):
+        current_app.logger.warning(f"Login attempt failed: Invalid password for user - {username}")
+        return APIResponse.error("Invalid username or password", 401)
+    
     try:
-        current_app.logger.info("Login attempt received")
-        data = request.get_json()
+        # 生成 token，确保 user_id 是字符串
+        access_token = create_access_token(identity=str(user.user_id))
+        current_app.logger.info(f"User {username} logged in successfully")
         
-        if not data:
-            current_app.logger.warning("Login attempt with no data")
-            return jsonify({"msg": "No input data provided"}), 400
-            
-        current_app.logger.debug(f"Login attempt for username: {data.get('username')}")
-        
-        if not data.get('username') or not data.get('password'):
-            current_app.logger.warning("Login attempt with missing credentials")
-            return jsonify({"msg": "Missing username or password"}), 400
-            
-        user = User.query.filter_by(username=data['username']).first()
-        
-        if not user:
-            current_app.logger.warning(f"Login attempt failed: User {data['username']} not found")
-            return jsonify({"msg": "Invalid username or password"}), 401
-            
-        # 记录密码验证结果
-        password_check = user.check_password(data['password'])
-        current_app.logger.debug(f"Password check result for user {data['username']}: {password_check}")
-            
-        if not password_check:
-            current_app.logger.warning(f"Login attempt failed: Invalid password for user {data['username']}")
-            return jsonify({"msg": "Invalid username or password"}), 401
-        
-        try:
-            # Use user ID as token identity
-            access_token = create_access_token(identity=str(user.user_id))
-            current_app.logger.info(f"User {user.username} logged in successfully")
-            
-            response_data = {
-                "msg": "success",
-                "data": {
-                    "token": f"Bearer {access_token}",
-                    "user": {
-                        "id": user.user_id,
-                        "username": user.username,
-                        "name": user.name,
-                        "role": user.role,
-                        "college": user.college,
-                        "student_id": user.student_id,
-                        "phone_number": user.phone_number,
-                        "total_points": user.total_points
-                    }
+        return APIResponse.success(
+            data={
+                "token": f"Bearer {access_token}",
+                "user": {
+                    "id": user.user_id,
+                    "username": user.username,
+                    "name": user.name,
+                    "role": user.role
                 }
-            }
-            current_app.logger.debug(f"Login response data: {response_data}")
-            return jsonify(response_data), 200
-        except Exception as token_error:
-            current_app.logger.error(f"Token creation error: {str(token_error)}")
-            return jsonify({"msg": "Error creating access token"}), 500
-            
+            },
+            msg="Login successful",
+            code=200
+        )
     except Exception as e:
-        current_app.logger.error(f"Login error: {str(e)}")
-        return jsonify({"msg": "Internal server error"}), 500
+        current_app.logger.error(f"Token creation error for user {username}: {str(e)}")
+        return APIResponse.error("Error creating access token", 500)
 
 @auth_bp.route('/profile', methods=['GET'])
 @jwt_required()
+@handle_exceptions
+@log_operation('get_profile')
 def get_profile():
     """
     获取用户个人信息
@@ -199,39 +191,66 @@ def get_profile():
       401:
         description: 未认证
     """
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return APIResponse.error("User not found", 404)
+    
+    profile_data = {
+        'username': user.username,
+        'name': user.name,
+        'role': user.role,
+        'college': user.college,
+        'total_points': user.total_points,
+        'phone_number': user.phone_number
+    }
+    return APIResponse.success(data=profile_data)
+
+@auth_bp.route('/info', methods=['GET'])
+@jwt_required()
+def get_user_info():
+    """
+    获取当前登录用户信息
+    ---
+    tags:
+      - 认证
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: 成功获取用户信息
+      404:
+        description: 用户不存在
+    """
     try:
         user_id = get_jwt_identity()
-        user = User.query.get(user_id)
-        if not user:
-            return jsonify({"msg": "User not found"}), 404
+        if not user_id:
+            return APIResponse.error('Invalid token', 401)
             
-        return jsonify({
+        user = User.query.get(int(user_id))
+        if not user:
+            return APIResponse.error('用户不存在', 404)
+            
+        # 返回所有关键信息
+        user_data = {
+            'id': user.user_id,
             'username': user.username,
             'name': user.name,
             'role': user.role,
             'college': user.college,
-            'total_points': user.total_points,
-            'phone_number': user.phone_number
-        }), 200
+            'student_id': user.student_id,
+            'phone_number': user.phone_number,
+            'total_points': user.total_points
+        }
+        return APIResponse.success(data=user_data)
     except Exception as e:
-        current_app.logger.error(f"Profile error: {str(e)}")
-        return jsonify({"msg": "Internal server error"}), 500
+        current_app.logger.error(f"Error getting user info: {str(e)}")
+        return APIResponse.error('获取用户信息失败', 500)
 
-def role_required(role):
-    def decorator(f):
-        @wraps(f)
-        @jwt_required()
-        def wrapper(*args, **kwargs):
-            try:
-                current_user = User.query.get(get_jwt_identity())
-                if not current_user:
-                    return jsonify({"msg": "User not found"}), 404
-                    
-                if current_user.role != role:
-                    return jsonify({"msg": "Insufficient permissions"}), 403
-                return f(*args, **kwargs)
-            except Exception as e:
-                current_app.logger.error(f"Role check error: {str(e)}")
-                return jsonify({"msg": "Internal server error"}), 500
-        return wrapper
-    return decorator
+@auth_bp.route('/check', methods=['GET'])
+@jwt_required()
+def check_token():
+    """
+    检查token是否有效
+    """
+    return APIResponse.success(msg="Token is valid")

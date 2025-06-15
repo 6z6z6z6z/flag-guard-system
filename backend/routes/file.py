@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
+
 from flask_jwt_extended import jwt_required
 import os
 import uuid
@@ -59,6 +60,7 @@ def upload_file():
         
         # 返回完整的URL路径
         return jsonify({
+            'code': 200,
             'msg': 'success',
             'data': {
                 'url': f'/api/uploads/{filename}'

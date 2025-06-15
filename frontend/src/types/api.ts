@@ -1,11 +1,11 @@
-// 通用响应类型
+// 閫氱敤鍝嶅簲绫诲瀷
 export interface ApiResponse<T = any> {
   code: number
   message: string
   data: T
 }
 
-// 用户相关类型
+// 鐢ㄦ埛鐩稿叧绫诲瀷
 export interface User {
   id: number
   username: string
@@ -15,7 +15,7 @@ export interface User {
   updated_at: string
 }
 
-// 事件相关类型
+// 浜嬩欢鐩稿叧绫诲瀷
 export interface Event {
   id: number
   title: string
@@ -29,7 +29,7 @@ export interface Event {
   updated_at: string
 }
 
-// 训练相关类型
+// 璁粌鐩稿叧绫诲瀷
 export interface Training {
   id: number
   title: string
@@ -42,7 +42,7 @@ export interface Training {
   updated_at: string
 }
 
-// 记录相关类型
+// 璁板綍鐩稿叧绫诲瀷
 export interface Record {
   id: number
   user_id: number
@@ -54,13 +54,13 @@ export interface Record {
   updated_at: string
 }
 
-// 登录请求参数
+// 鐧诲綍璇锋眰鍙傛暟
 export interface LoginParams {
   username: string
   password: string
 }
 
-// 注册请求参数
+// 娉ㄥ唽璇锋眰鍙傛暟
 export interface RegisterParams {
   username: string
   email: string
