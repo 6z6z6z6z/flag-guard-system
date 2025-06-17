@@ -1,5 +1,9 @@
 <template>
   <div class="login-bg" style="background-image: url('/login-bg.jpg')">
+    <div class="header-container">
+      <img src="/logo.png" alt="Logo" class="header-logo" />
+      <span class="header-title">中国科学技术大学 校学生国旗护卫队</span>
+    </div>
     <div class="login-container">
       <h2 class="login-title">国旗护卫队管理系统</h2>
       <el-form
@@ -130,6 +134,7 @@ const handleLogin = async () => {
 
 <style scoped>
 .login-bg {
+  position: relative;
   width: 100vw;
   height: 100vh;
   /* background-image is now an inline style */
@@ -139,6 +144,28 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: flex-end; /* 让内容靠右 */
+}
+
+.header-container {
+  position: absolute;
+  top: 5vh;
+  left: 5vw;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-logo {
+  width: 65px;
+  height: 65px;
+}
+
+.header-title {
+  font-size: 30px; /* 增大字号以适应手写体 */
+  font-weight: normal; /* 手写体通常不需要加粗 */
+  color: rgb(28, 30, 185);
+  font-family: 'Ma Shan Zheng', cursive;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .login-container {
