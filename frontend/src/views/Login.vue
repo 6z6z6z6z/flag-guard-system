@@ -32,7 +32,7 @@
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" native-type="submit" :loading="loading" block size="large">
+          <el-button native-type="submit" :loading="loading" size="large" block>
             登录
           </el-button>
         </el-form-item>
@@ -197,5 +197,18 @@ const handleLogin = async () => {
 
 .register-link a:hover {
   text-decoration: underline;
+}
+
+.login-container .el-button {
+  width: 100%; /* Force button to be full-width */
+  background-color: rgb(53, 152, 219);
+  color: #ffffff;
+  border: none;
+}
+
+.login-container .el-button:hover,
+.login-container .el-button:focus {
+  background-color: rgb(43, 132, 199); /* A slightly darker shade for hover */
+  color: #ffffff;
 }
 </style> 
