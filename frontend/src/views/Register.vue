@@ -44,7 +44,7 @@
           <el-form-item label="手机号" prop="phone_number">
             <el-input v-model="registerForm.phone_number" placeholder="请输入手机号" />
           </el-form-item>
-          <el-form-item>
+          <el-form-item class="register-btn-container">
             <el-button type="primary" native-type="submit" :loading="loading" block>
               注册
             </el-button>
@@ -186,19 +186,18 @@ const handleInput = (field: keyof typeof registerForm) => {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* B- Wrapper to position the card */
+
 .form-wrapper {
   margin-right: 5vw;
 }
 
-/* C- Original styles, slightly adjusted */
 .register-card {
-  width: 380px; 
+  width: 350px; 
   background: rgba(255, 255, 255, 0.98);
   border-radius: 8px;
   border: none; 
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.1);
- 
+  padding: 20px 20px 20px 2px;
 }
 
 
@@ -222,5 +221,23 @@ const handleInput = (field: keyof typeof registerForm) => {
 
 .register-link a:hover {
   text-decoration: underline;
+}
+
+.register-btn-container :deep(.el-form-item__content) {
+  margin-left: 0 !important; 
+  justify-content: center;  
+}
+
+.register-card .el-button {
+  width: 60%;
+  background-color: rgb(53, 152, 219);
+  color: #ffffff;
+  border: none;
+}
+
+.register-card .el-button:hover,
+.register-card .el-button:focus {
+  background-color: rgb(43, 132, 199);
+  color: #ffffff;
 }
 </style>
