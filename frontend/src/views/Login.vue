@@ -1,29 +1,34 @@
 <template>
-  <div class="login-container">
-    <el-card class="login-card">
-      <template #header>
-        <h2 class="login-title">国旗护卫队管理系统</h2>
-      </template>
+  <div class="login-bg" style="background-image: url('/login-bg.jpg')">
+    <div class="login-container">
+      <h2 class="login-title">国旗护卫队管理系统</h2>
       <el-form
         ref="formRef"
         :model="loginForm"
         :rules="rules"
-        label-width="80px"
+        label-position="top"
         @submit.prevent="handleLogin"
       >
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="loginForm.username" placeholder="请输入用户名" />
+        <el-form-item prop="username">
+          <el-input 
+            v-model="loginForm.username" 
+            placeholder="请输入用户名" 
+            :prefix-icon="UserIcon"
+            size="large"
+          />
         </el-form-item>
-        <el-form-item label="密码" prop="password">
+        <el-form-item prop="password">
           <el-input
             v-model="loginForm.password"
             type="password"
             placeholder="请输入密码"
             show-password
+            :prefix-icon="LockIcon"
+            size="large"
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" native-type="submit" :loading="loading" block>
+          <el-button type="primary" native-type="submit" :loading="loading" block size="large">
             登录
           </el-button>
         </el-form-item>
@@ -31,7 +36,7 @@
           <router-link to="/register">没有账号？立即注册</router-link>
         </div>
       </el-form>
-    </el-card>
+    </div>
   </div>
 </template>
 
@@ -41,6 +46,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { useUserStore } from '../stores/user'
+import { User as UserIcon, Lock as LockIcon } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -123,22 +129,33 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-.login-container {
+.login-bg {
+  width: 100vw;
   height: 100vh;
+  /* background-image is now an inline style */
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
   display: flex;
-  justify-content: center;
   align-items: center;
-  background-color: #f5f7fa;
+  justify-content: flex-end; /* 让内容靠右 */
 }
 
-.login-card {
-  width: 400px;
+.login-container {
+  width: 330px; /* 再次减小宽度 */
+  margin-right: 5vw; /* 再次增加右边距 */
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 8px;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.1);
+  padding: 30px;
 }
 
 .login-title {
   text-align: center;
-  margin: 0;
-  color: #409eff;
+  margin: 0 0 28px 0; /* 增加标题下边距 */
+  color: #333;
+  font-weight: 600; /* 字体加粗 */
+  font-size: 22px; /* 字体稍大 */
 }
 
 .register-link {
