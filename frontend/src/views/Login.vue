@@ -161,16 +161,16 @@ const handleLogin = async () => {
 }
 
 .header-title {
-  font-size: 30px; /* 增大字号以适应手写体 */
-  font-weight: normal; /* 手写体通常不需要加粗 */
-  color: rgb(28, 30, 185);
+  font-size: 30px; 
+  font-weight: normal; 
+  color:rgba(20, 59, 211, 0.566);
   font-family: 'Ma Shan Zheng', cursive;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .login-container {
-  width: 330px; /* 再次减小宽度 */
-  margin-right: 5vw; /* 再次增加右边距 */
+  width: 300px; 
+  margin-right: 5vw; 
   background: rgba(255, 255, 255, 0.98);
   border-radius: 8px;
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.1);
