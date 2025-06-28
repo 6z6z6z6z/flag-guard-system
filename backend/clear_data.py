@@ -19,7 +19,7 @@ def create_default_admin():
         admin = User(
             username='admin',
             name='系统管理员',
-            role='admin',
+            role='superadmin',
             student_id='admin001',
             college='系统管理',
             total_points=0

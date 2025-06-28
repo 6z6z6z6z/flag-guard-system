@@ -1,215 +1,128 @@
-// @ts-nocheck
 <template>
   <div class="trainings-container">
-    <!-- 创建训练表单 -->
-    <el-card class="create-card" v-if="isAdmin">
-      <template #header>
-        <div class="card-header">
-          <h3>创建训练</h3>
-        </div>
-      </template>
+    <div class="header-controls">
+      <h1 class="page-title">训练列表</h1>
+      <el-button v-if="isAdmin" type="primary" @click="showCreateDialog" :icon="Plus">
+        创建训练
+      </el-button>
+    </div>
+    <el-divider />
 
+    <div class="content-area" v-loading="loading">
+      <el-row :gutter="20" v-if="trainings.length > 0">
+        <el-col :xs="24" :sm="12" :md="8" v-for="training in trainings" :key="training.training_id" class="training-col">
+          <el-card class="training-card" shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <span class="training-name">{{ training.name }}</span>
+                <el-tag :type="getTrainingStatus(training).type" size="small">
+                  {{ getTrainingStatus(training).text }}
+                </el-tag>
+              </div>
+            </template>
+            <div class="card-body">
+              <p><el-icon><Calendar /></el-icon> <strong>时间：</strong>{{ formatDateTimeRange(training.start_time, training.end_time) }}</p>
+              <p><el-icon><Location /></el-icon> <strong>地点：</strong>{{ training.location }}</p>
+              <p><el-icon><Star /></el-icon> <strong>积分：</strong>{{ training.points }}</p>
+            </div>
+            <div class="card-footer">
+              <div class="user-actions">
+                <!-- 用户操作 -->
+                <el-button
+                  v-if="!training.is_registered && getTrainingStatus(training).text === '未开始'"
+                  type="success"
+                  size="small"
+                  @click="handleRegister(training)"
+                  round
+                >
+                  报名参加
+                </el-button>
+                <el-button
+                  v-else-if="training.is_registered && getTrainingStatus(training).text === '未开始'"
+                  type="danger"
+                  size="small"
+                  @click="handleCancelRegister(training)"
+                  round
+                >
+                  取消报名
+                </el-button>
+                <el-tag v-else-if="training.is_registered" type="info" size="small">已报名</el-tag>
+              </div>
+
+              <!-- 管理员操作 -->
+              <div class="admin-actions" v-if="isAdmin">
+                 <el-button type="primary" link @click="handleEdit(training)">编辑</el-button>
+                 <el-button type="danger" link @click="handleDelete(training.training_id)">删除</el-button>
+                 <el-button type="info" link @click="handleViewRegistrations(training)">查看报名</el-button>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+      <el-empty v-else description="暂无训练"></el-empty>
+    </div>
+
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
+
+    <!-- 创建/编辑对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑训练' : '创建训练'"
+      width="500px"
+      @close="resetForm"
+      :body-style="{ padding: '20px 60px' }"
+    >
       <el-form
         ref="formRef"
         :model="form"
         :rules="rules"
         label-width="100px"
-        :disabled="submitting"
       >
         <el-form-item label="训练名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入训练名称" />
         </el-form-item>
-
         <el-form-item label="开始时间" prop="start_time">
           <el-date-picker
             v-model="form.start_time"
             type="datetime"
-            placeholder="选择开始时间"
-            value-format="YYYY-MM-DD HH:mm"
+            placeholder="选择开始日期时间"
             format="YYYY-MM-DD HH:mm"
-            @change="handleStartTimeChange"
+            value-format="YYYY-MM-DD HH:mm:ss"
             style="width: 100%"
           />
         </el-form-item>
-
         <el-form-item label="结束时间" prop="end_time">
           <el-date-picker
             v-model="form.end_time"
             type="datetime"
-            placeholder="选择结束时间"
-            value-format="YYYY-MM-DD HH:mm"
+            placeholder="选择结束日期时间"
             format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DD HH:mm:ss"
             style="width: 100%"
           />
         </el-form-item>
-
         <el-form-item label="积分" prop="points">
           <el-input-number v-model="form.points" :min="1" style="width: 100%" />
         </el-form-item>
-
         <el-form-item label="地点" prop="location">
           <el-input v-model="form.location" placeholder="请输入训练地点" />
         </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSubmit" :loading="submitting">
-            创建训练
-          </el-button>
-        </el-form-item>
       </el-form>
-    </el-card>
-
-    <!-- 训练列表 -->
-    <el-card class="list-card">
-      <template #header>
-        <div class="card-header">
-          <h3>训练列表</h3>
-        </div>
-      </template>
-
-      <el-table 
-        :data="trainings" 
-        style="width: 100%" 
-        v-loading="loading"
-        border
-        stripe
-      >
-        <el-table-column prop="name" label="训练名称" min-width="120" />
-        <el-table-column prop="start_time" label="开始时间" min-width="160">
-          <template #default="{ row }">
-            {{ formatDate(row.start_time) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="end_time" label="结束时间" min-width="160">
-          <template #default="{ row }">
-            {{ formatDate(row.end_time) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="points" label="积分" width="80" align="center" />
-        <el-table-column prop="location" label="地点" min-width="120" />
-        <el-table-column label="操作" width="320" fixed="right">
-          <template #default="{ row }">
-            <div class="operation-buttons">
-              <el-button-group>
-                <el-button 
-                  type="primary" 
-                  size="small" 
-                  @click="handleEdit(row)"
-                  :disabled="isActionDisabled(row)"
-                  v-if="isAdmin"
-                >
-                  编辑
-                </el-button>
-                <el-button 
-                  type="danger" 
-                  size="small" 
-                  @click="handleDelete(row.training_id)"
-                  :disabled="isActionDisabled(row)"
-                  v-if="isAdmin"
-                >
-                  删除
-                </el-button>
-              </el-button-group>
-              <el-button-group>
-                <el-button 
-                  type="success" 
-                  size="small" 
-                  @click="handleRegister(row)"
-                  v-if="!row.is_registered"
-                  :disabled="isTrainingStarted(row.start_time)"
-                >
-                  报名
-                </el-button>
-                <el-button 
-                  type="danger" 
-                  size="small" 
-                  @click="handleCancelRegister(row)"
-                  v-if="row.is_registered"
-                  :disabled="isTrainingStarted(row.start_time)"
-                >
-                  取消报名
-                </el-button>
-                <el-button 
-                  type="info" 
-                  size="small" 
-                  @click="handleViewRegistrations(row)"
-                  v-if="isAdmin"
-                >
-                  查看报名
-                </el-button>
-              </el-button-group>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="pagination">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          :total="total"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </el-card>
-
-    <!-- 编辑对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="'编辑训练 - ' + (currentTraining?.name || '')"
-      width="50%"
-    >
-      <el-form
-        ref="editFormRef"
-        :model="editForm"
-        :rules="rules"
-        label-width="100px"
-        :disabled="submitting"
-      >
-        <el-form-item label="训练名称" prop="name">
-          <el-input v-model="editForm.name" placeholder="请输入训练名称" />
-        </el-form-item>
-
-        <el-form-item label="开始时间" prop="start_time">
-          <el-date-picker
-            v-model="editForm.start_time"
-            type="datetime"
-            placeholder="选择开始时间"
-            value-format="YYYY-MM-DD HH:mm"
-            format="YYYY-MM-DD HH:mm"
-            @change="handleStartTimeChange"
-            style="width: 100%"
-          />
-        </el-form-item>
-
-        <el-form-item label="结束时间" prop="end_time">
-          <el-date-picker
-            v-model="editForm.end_time"
-            type="datetime"
-            placeholder="选择结束时间"
-            value-format="YYYY-MM-DD HH:mm"
-            format="YYYY-MM-DD HH:mm"
-            style="width: 100%"
-          />
-        </el-form-item>
-
-        <el-form-item label="积分" prop="points">
-          <el-input-number v-model="editForm.points" :min="1" style="width: 100%" />
-        </el-form-item>
-
-        <el-form-item label="地点" prop="location">
-          <el-input v-model="editForm.location" placeholder="请输入训练地点" />
-        </el-form-item>
-      </el-form>
-
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleUpdate" :loading="submitting">
-            保存
+          <el-button type="primary" @click="handleSubmit">
+            {{ isEdit ? '保存' : '创建' }}
           </el-button>
         </span>
       </template>
@@ -220,51 +133,49 @@
       v-model="registrationsDialogVisible"
       title="报名名单"
       width="80%"
+      @close="currentTraining = null"
     >
-      <el-table :data="currentRegistrations" style="width: 100%">
-        <el-table-column prop="student_id" label="学号" width="120" />
-        <el-table-column prop="name" label="姓名" width="120" />
+      <el-table :data="currentRegistrations" style="width: 100%" v-loading="registrationsLoading">
+        <el-table-column prop="student_id" label="学号" />
+        <el-table-column prop="name" label="姓名" />
         <el-table-column prop="college" label="学院" />
-        <el-table-column prop="created_at" label="报名时间" width="180">
+        <el-table-column prop="created_at" label="报名时间">
           <template #default="{ row }">
             {{ formatRegistrationTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column prop="attendance_status" label="出勤状态" width="120">
-          <template #default="{ row }">
-            <el-tag
-              :type="getAttendanceStatusType(row.attendance_status)"
-              v-if="row.attendance_status"
-            >
-              {{ getAttendanceStatusText(row.attendance_status) }}
-            </el-tag>
-            <span v-else>未审核</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="points_awarded" label="获得积分" width="100">
-          <template #default="{ row }">
-            {{ row.points_awarded || 0 }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180" v-if="isAdmin">
+        <el-table-column prop="attendance_status" label="出勤状态">
           <template #default="{ row }">
             <el-select 
               v-model="row.attendance_status" 
               placeholder="考勤状态"
-              @change="(status: string) => handleUpdateAttendance(row.registration_id, status)"
+              style="width: 120px;"
+              :disabled="isAttendanceDisabled"
             >
-              <el-option label="出勤" value="present" />
-              <el-option label="缺勤" value="absent" />
-              <el-option label="迟到" value="late" />
-              <el-option label="早退" value="early_leave" />
+              <el-option label="出勤" value="present"></el-option>
+              <el-option label="缺勤" value="absent"></el-option>
+              <el-option label="迟到" value="late"></el-option>
+              <el-option label="早退" value="early_leave"></el-option>
             </el-select>
           </template>
         </el-table-column>
+        <el-table-column prop="points_awarded" label="获得积分">
+          <template #default="{ row }">
+            {{ row.points_awarded || 0 }}
+          </template>
+        </el-table-column>
       </el-table>
-      <template #footer>
+       <template #footer>
         <span class="dialog-footer">
           <el-button @click="registrationsDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmAttendance" :loading="submitting">确认考勤</el-button>
+          <el-button 
+            type="primary" 
+            @click="submitAttendance" 
+            :loading="isSubmitting"
+            :disabled="isAttendanceDisabled || isSubmitting"
+          >
+            确认考勤
+          </el-button>
         </span>
       </template>
     </el-dialog>
@@ -272,259 +183,353 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useTrainingStore } from '@/stores/training'
-import { useUserStore } from '@/stores/user'
-import { storeToRefs } from 'pinia'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import type { FormInstance, FormRules } from 'element-plus'
-import { Training, Registration } from '@/types/training'
-import { formatDate, isTrainingStarted, formatRegistrationTime } from '@/utils/formatDate'
+import { ref, onMounted, computed, reactive } from 'vue';
+import { useUserStore } from '@/stores/user';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import type { FormInstance, FormRules } from 'element-plus';
+import axios from 'axios';
+import { Plus, Calendar, Location, Star } from '@element-plus/icons-vue';
 
-const trainingStore = useTrainingStore()
-const userStore = useUserStore()
+interface Training {
+  training_id: number;
+  name: string;
+  start_time: string;
+  end_time: string;
+  points: number;
+  location: string;
+  is_registered?: boolean;
+}
 
-const { trainings, total, loading } = storeToRefs(trainingStore)
-const { isAdmin } = storeToRefs(userStore)
+interface Registration {
+    user_id: number;
+    student_id: string;
+    name: string;
+    college: string;
+    created_at: string;
+    attendance_status: 'present' | 'absent' | 'late' | 'early_leave' | null;
+    points_awarded: number | null;
+    status: string;
+}
 
-const currentPage = ref(1)
-const pageSize = ref(10)
+const api = axios.create({
+  baseURL: process.env.VUE_APP_API_BASE_URL || 'http://127.0.0.1:5000/api',
+});
 
-const formRef = ref<FormInstance>()
-const editFormRef = ref<FormInstance>()
-const dialogVisible = ref(false)
-const registrationsDialogVisible = ref(false)
-const submitting = ref(false)
+api.interceptors.request.use(config => {
+  const userStore = useUserStore();
+  const token = userStore.getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
-const form = ref({
+const userStore = useUserStore();
+const isAdmin = computed(() => userStore.userInfo?.role === 'admin');
+
+const trainings = ref<Training[]>([]);
+const loading = ref(true);
+const currentPage = ref(1);
+const pageSize = ref(10);
+const total = ref(0);
+
+const dialogVisible = ref(false);
+const isEdit = ref(false);
+const formRef = ref<FormInstance>();
+const form = reactive({
+  training_id: null as number | null,
   name: '',
-  start_time: '',
-  end_time: '',
+  start_time: null as Date | null,
+  end_time: null as Date | null,
   points: 1,
   location: '',
-})
+});
 
-const editForm = ref<Partial<Training>>({})
-const currentTraining = ref<Training | null>(null)
-const currentRegistrations = ref<Registration[]>([])
-
-const rules = ref<FormRules>({
+const rules = reactive<FormRules>({
   name: [{ required: true, message: '请输入训练名称', trigger: 'blur' }],
   start_time: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
   end_time: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
   points: [{ required: true, message: '请输入积分', trigger: 'blur' }],
   location: [{ required: true, message: '请输入地点', trigger: 'blur' }],
-})
+});
 
-const fetchTrainings = () => {
-  trainingStore.getTrainings(currentPage.value, pageSize.value)
-}
+const getTrainingStatus = (training: Training) => {
+  const now = new Date();
+  const startTime = new Date(training.start_time);
+  const endTime = new Date(training.end_time);
 
-onMounted(fetchTrainings)
+  if (now > endTime) {
+    return { text: '已结束', type: 'info' as const };
+  }
+  if (now >= startTime && now <= endTime) {
+    return { text: '进行中', type: 'success' as const };
+  }
+  return { text: '未开始', type: 'warning' as const };
+};
+
+const resetForm = () => {
+  form.training_id = null;
+  form.name = '';
+
+  const startDate = new Date();
+  const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour later
+  form.start_time = startDate;
+  form.end_time = endDate;
+  
+  form.points = 1;
+  form.location = '';
+  isEdit.value = false;
+};
+
+const fetchTrainings = async () => {
+  loading.value = true;
+  try {
+    const response = await api.get('/trainings/', {
+      params: {
+        page: currentPage.value,
+        per_page: pageSize.value,
+      },
+    });
+    if (response.data && response.data.data && response.data.data.items) {
+      trainings.value = response.data.data.items;
+      total.value = response.data.data.total;
+    } else {
+      trainings.value = [];
+      total.value = 0;
+    }
+  } catch (error) {
+    console.error('Failed to fetch trainings:', error);
+    ElMessage.error('获取训练列表失败');
+  } finally {
+    loading.value = false;
+  }
+};
 
 const handleSizeChange = (val: number) => {
-  pageSize.value = val
-  fetchTrainings()
-}
+  pageSize.value = val;
+  fetchTrainings();
+};
 
 const handleCurrentChange = (val: number) => {
-  currentPage.value = val
-  fetchTrainings()
-}
+  currentPage.value = val;
+  fetchTrainings();
+};
+
+const showCreateDialog = () => {
+  resetForm();
+  dialogVisible.value = true;
+};
+
+const handleEdit = (training: Training) => {
+  isEdit.value = true;
+  form.training_id = training.training_id;
+  form.name = training.name;
+  form.start_time = new Date(training.start_time);
+  form.end_time = new Date(training.end_time);
+  form.points = training.points;
+  form.location = training.location;
+  dialogVisible.value = true;
+};
 
 const handleSubmit = async () => {
-  if (!formRef.value) return
+  if (!formRef.value) return;
   await formRef.value.validate(async (valid) => {
     if (valid) {
-      submitting.value = true
+      if (!form.start_time || !form.end_time) return;
+
+      if (new Date(form.end_time) <= new Date(form.start_time)) {
+        ElMessage.error('结束时间必须晚于开始时间');
+        return;
+      }
+      
+      const payload = {
+        name: form.name,
+        start_time: form.start_time,
+        end_time: form.end_time,
+        points: form.points,
+        location: form.location,
+        training_id: form.training_id,
+      };
+
+      const url = isEdit.value ? `/trainings/${payload.training_id}` : '/trainings/';
+      const method = isEdit.value ? 'put' : 'post';
       try {
-        await trainingStore.createTraining(form.value)
-        ElMessage.success('创建成功')
-        formRef.value?.resetFields()
-        fetchTrainings()
+        await api[method](url, payload);
+        ElMessage.success(isEdit.value ? '更新成功' : '创建成功');
+        dialogVisible.value = false;
+        fetchTrainings();
       } catch (error) {
-        ElMessage.error('创建失败')
-      } finally {
-        submitting.value = false
+        console.error('Failed to save training:', error);
+        ElMessage.error('操作失败');
       }
     }
-  })
-}
-
-const handleEdit = (row: Training) => {
-  currentTraining.value = row
-  editForm.value = { ...row }
-  dialogVisible.value = true
-}
-
-const handleUpdate = async () => {
-  if (!editFormRef.value) return
-  if (!currentTraining.value) {
-    ElMessage.error('没有选中的训练，无法更新')
-    return
-  }
-
-  await editFormRef.value.validate(async (valid) => {
-    if (valid) {
-      const trainingId = currentTraining.value?.training_id
-      if (!trainingId) {
-        ElMessage.error("无法获取训练ID")
-        return
-      }
-
-      submitting.value = true
-      try {
-        await trainingStore.updateTraining(trainingId, editForm.value)
-        ElMessage.success('更新成功')
-        dialogVisible.value = false
-        fetchTrainings()
-      } catch (error) {
-        ElMessage.error('更新失败')
-      } finally {
-        submitting.value = false
-      }
-    }
-  })
-}
+  });
+};
 
 const handleDelete = async (trainingId: number) => {
-  await ElMessageBox.confirm('确定删除这项训练吗？', '提示', {
+  await ElMessageBox.confirm('确定要删除这个训练吗?', '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
     type: 'warning',
-  })
+  });
   try {
-    await trainingStore.deleteTraining(trainingId)
-    ElMessage.success('删除成功')
-    fetchTrainings()
-  } catch (error) {
-    ElMessage.error('删除失败')
-  }
-}
-
-const handleRegister = async (row: Training) => {
-  try {
-    await trainingStore.registerTraining(row.training_id)
-    ElMessage.success('报名成功')
-    fetchTrainings()
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.msg || '报名失败')
-  }
-}
-
-const handleCancelRegister = async (row: Training) => {
-  try {
-    await trainingStore.cancelRegister(row.training_id)
-    ElMessage.success('取消报名成功')
-    fetchTrainings()
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.msg || '取消报名失败')
-  }
-}
-
-const handleViewRegistrations = async (row: Training) => {
-  try {
-    currentTraining.value = row;
-    currentRegistrations.value = await trainingStore.getRegistrations(row.training_id)
-    registrationsDialogVisible.value = true
-  } catch (error) {
-    ElMessage.error('获取报名列表失败')
-  }
-}
-
-const handleStartTimeChange = (val: string) => {
-  if (val && !form.value.end_time) {
-    const startTime = new Date(val)
-    const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000) // 默认2小时
-    form.value.end_time = formatDate(endTime.toISOString())
-  }
-}
-
-// --- Helper functions for attendance ---
-
-const getAttendanceStatusType = (status: string | null) => {
-  switch (status) {
-    case 'present': return 'success';
-    case 'late':
-    case 'early_leave': return 'warning';
-    case 'absent': return 'danger';
-    default: return 'info';
-  }
-};
-
-const getAttendanceStatusText = (status: string | null) => {
-  switch (status) {
-    case 'present': return '出勤';
-    case 'late': return '迟到';
-    case 'early_leave': return '早退';
-    case 'absent': return '缺勤';
-    default: return '未审核';
-  }
-};
-
-const calculatePoints = (status: string, basePoints: number) => {
-  switch (status) {
-    case 'present': return basePoints;
-    case 'late':
-    case 'early_leave': return basePoints * 0.5;
-    case 'absent': return 0;
-    default: return 0;
-  }
-};
-
-const handleUpdateAttendance = async (registrationId: number, status: string) => {
-  if (!currentTraining.value) return;
-  const points = calculatePoints(status, currentTraining.value.points);
-
-  const index = currentRegistrations.value.findIndex(reg => reg.registration_id === registrationId);
-  if (index !== -1) {
-    currentRegistrations.value[index].attendance_status = status as any;
-    currentRegistrations.value[index].points_awarded = points;
-  }
-};
-
-const confirmAttendance = async () => {
-  if (!currentTraining.value) return;
-  
-  const updates = currentRegistrations.value.map(reg => ({
-    registration_id: reg.registration_id,
-    attendance_status: reg.attendance_status,
-    points_awarded: reg.points_awarded,
-  }));
-
-  submitting.value = true;
-  try {
-    await trainingStore.confirmAttendance(currentTraining.value.training_id, updates);
-    ElMessage.success('出勤情况确认成功');
-    registrationsDialogVisible.value = false;
+    await api.delete(`/trainings/${trainingId}`);
+    ElMessage.success('删除成功');
     fetchTrainings();
   } catch (error) {
-    ElMessage.error('确认考勤失败');
-  } finally {
-    submitting.value = false;
+    console.error('Failed to delete training:', error);
+    ElMessage.error('删除失败');
   }
 };
 
-const isActionDisabled = (training: any) => {
-  if (userStore.isAdmin) {
-    return false // 管理员始终可以操作
+const handleRegister = async (training: Training) => {
+  try {
+    await api.post(`/trainings/${training.training_id}/register`);
+    ElMessage.success('报名成功');
+    fetchTrainings();
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.message || '报名失败');
   }
-  return new Date(training.end_time) < new Date()
-}
+};
 
+const handleCancelRegister = async (training: Training) => {
+  try {
+    await api.delete(`/trainings/${training.training_id}/register`);
+    ElMessage.success('取消报名成功');
+    fetchTrainings();
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.message || '取消报名失败');
+  }
+};
+
+const registrationsDialogVisible = ref(false);
+const currentRegistrations = ref<Registration[]>([]);
+const registrationsLoading = ref(false);
+const currentTrainingId = ref<number | null>(null);
+const currentTraining = ref<Training | null>(null);
+const isSubmitting = ref(false);
+const isAttendanceConfirmed = ref(false);
+
+const isAttendanceDisabled = computed(() => {
+  if (!currentTraining.value) return true;
+  if (isAttendanceConfirmed.value) return true;
+  return new Date(currentTraining.value.start_time) > new Date();
+});
+
+const handleViewRegistrations = async (training: Training) => {
+  currentTraining.value = training;
+  currentTrainingId.value = training.training_id;
+  registrationsLoading.value = true;
+  registrationsDialogVisible.value = true;
+  
+  try {
+    const response = await api.get(`/trainings/${training.training_id}/registrations`);
+    if (response.data && response.data.data) {
+      const regs = response.data.data as Registration[];
+      currentRegistrations.value = regs;
+      isAttendanceConfirmed.value = regs.some(r => r.attendance_status);
+    } else {
+      currentRegistrations.value = [];
+      isAttendanceConfirmed.value = false;
+    }
+  } catch (error) {
+    console.error('Failed to fetch registrations:', error);
+    ElMessage.error('获取报名列表失败');
+  } finally {
+    registrationsLoading.value = false;
+  }
+};
+
+const submitAttendance = async () => {
+  if (!currentTraining.value?.training_id) return;
+  isSubmitting.value = true;
+
+  const payload = {
+    attendance_records: currentRegistrations.value.map(reg => ({
+      user_id: reg.user_id,
+      attendance_status: reg.attendance_status
+    }))
+  };
+
+  try {
+    await api.post(`/trainings/${currentTraining.value.training_id}/attendance`, payload);
+    ElMessage.success('考勤状态更新成功');
+    registrationsDialogVisible.value = false;
+  } catch (error) {
+    console.error('Failed to submit attendance:', error);
+    ElMessage.error('更新考勤失败');
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const formatDateTimeRange = (start: string, end: string) => {
+  if (!start) return 'N/A';
+  
+  const startDate = new Date(start);
+  const startDateTime = startDate.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).replace(/,/g, '');
+
+  if (!end) {
+    return startDateTime;
+  }
+
+  const endDate = new Date(end);
+  const endTime = endDate.toLocaleString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+
+  return `${startDateTime} - ${endTime}`;
+};
+
+const formatRegistrationTime = (timeStr: string) => {
+  if (!timeStr) return '';
+  const date = new Date(timeStr);
+  return date.toLocaleString('zh-CN', { hour12: false });
+};
+
+onMounted(() => {
+  fetchTrainings();
+});
 </script>
 
 <style scoped>
 .trainings-container {
   padding: 20px;
-  background-color: #f5f7fa;
-  min-height: calc(100vh - 60px);
 }
 
-.create-card {
+.header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
 }
 
-.list-card {
+.page-title {
+  margin: 0;
+  font-size: 24px;
+}
+
+.content-area {
+  margin-top: 20px;
+}
+
+.training-col {
   margin-bottom: 20px;
+}
+
+.training-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .card-header {
@@ -533,46 +538,50 @@ const isActionDisabled = (training: any) => {
   align-items: center;
 }
 
-.card-header h3 {
-  margin: 0;
-  font-size: 18px;
-  color: #303133;
+.training-name {
+  font-weight: bold;
 }
 
-.operation-buttons {
+.card-body {
+  flex-grow: 1;
+}
+
+.card-body p {
+  margin: 0 0 10px;
   display: flex;
+  align-items: center;
   gap: 8px;
-  justify-content: center;
-}
-
-.pagination {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-:deep(.el-table) {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-:deep(.el-table th) {
-  background-color: #f5f7fa;
   color: #606266;
-  font-weight: 600;
 }
 
-:deep(.el-button-group) {
-  display: inline-flex;
+.card-body .el-icon {
+  color: #409EFF;
 }
 
-:deep(.el-button-group .el-button) {
-  margin: 0;
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid #ebeef5;
 }
-</style> 
+
+.user-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+</style>

@@ -79,13 +79,13 @@ def validate_phone_number(phone_number):
         return False, "Invalid phone number format"
     return True, None
 
-def role_required(role):
-    """角色权限检查装饰器"""
+def role_required(*roles):
+    """角色权限检查装饰器，允许多个角色"""
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             current_app.logger.info("=== Role Check Start ===")
-            current_app.logger.info(f"Required role: {role}")
+            current_app.logger.info(f"Required roles: {roles}")
             
             try:
                 # 获取当前用户ID
@@ -111,9 +111,9 @@ def role_required(role):
                     }), 401
                 
                 # 检查用户角色
-                current_app.logger.info(f"User role: {user.role}, Required role: {role}")
-                if user.role != role:
-                    current_app.logger.warning(f"Permission denied: User role {user.role} != Required role {role}")
+                current_app.logger.info(f"User role: {user.role}, Required roles: {roles}")
+                if user.role not in roles:
+                    current_app.logger.warning(f"Permission denied: User role '{user.role}' not in required roles {roles}")
                     return jsonify({
                         'message': 'Permission denied',
                         'code': 403

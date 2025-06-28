@@ -1,68 +1,74 @@
 <template>
-  <div class="events">
-    <div class="header">
-      <h2>活动管理</h2>
-      <el-button v-if="userStore.userInfo?.role === 'admin'" type="primary" @click="showCreateDialog">创建活动</el-button>
+  <div class="events-container">
+    <div class="header-controls">
+      <h1 class="page-title">活动列表</h1>
+      <el-button v-if="userStore.userInfo?.role === 'admin'" type="primary" @click="showCreateDialog" :icon="Plus">创建活动</el-button>
+    </div>
+    <el-divider />
+
+    <div class="content-area">
+      <el-row :gutter="20" v-if="events.length > 0">
+        <el-col :xs="24" :sm="12" :md="8" v-for="event in events" :key="event.event_id" class="event-col">
+          <el-card class="event-card" shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <span class="event-name">{{ event.name }}</span>
+                <el-tag :type="isEventExpired(event.time) ? 'info' : 'success'" size="small">
+                  {{ isEventExpired(event.time) ? '已结束' : '进行中' }}
+                </el-tag>
+              </div>
+            </template>
+            <div class="card-body">
+              <p><el-icon><Timer /></el-icon> <strong>时间：</strong>{{ formatTime(event.time) }}</p>
+              <p><el-icon><Location /></el-icon> <strong>地点：</strong>{{ event.location }}</p>
+              <p><el-icon><Umbrella /></el-icon> <strong>着装：</strong> {{ event.uniform_required }}</p>
+            </div>
+            <div class="card-footer">
+              <div class="actions">
+                <!-- 报名/取消报名按钮 -->
+                <el-button
+                  v-if="!event.is_registered && !isEventExpired(event.time)"
+                  type="success"
+                  size="small"
+                  @click="registerEvent(event)"
+                  round
+                >
+                  报名参加
+                </el-button>
+                <el-button
+                  v-else-if="event.is_registered && !isEventExpired(event.time)"
+                  type="danger"
+                  size="small"
+                  @click="cancelRegistration(event)"
+                  round
+                >
+                  取消报名
+                </el-button>
+                 <el-button
+                  v-else-if="isEventExpired(event.time)"
+                  type="info"
+                  size="small"
+                  disabled
+                  round
+                >
+                  活动已结束
+                </el-button>
+
+                <!-- 管理员操作 -->
+                <div class="admin-actions" v-if="userStore.userInfo?.role === 'admin'">
+                   <el-button type="primary" link @click="showEditDialog(event)">编辑</el-button>
+                   <el-button type="danger" link @click="handleDelete(event)">删除</el-button>
+                   <el-button type="info" link @click="showRegistrations(event)">查看报名</el-button>
+                </div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+      <el-empty v-else description="暂无活动"></el-empty>
     </div>
 
-    <el-table 
-      :data="events" 
-      style="width: 100%" 
-      v-loading="loading"
-      :resize-observer="false"
-      :max-height="500"
-    >
-      <el-table-column prop="name" label="活动名称" min-width="150" />
-      <el-table-column prop="location" label="地点" min-width="120" />
-      <el-table-column prop="time" label="时间" min-width="180">
-        <template #default="{ row }">
-          {{ formatTime(row.time) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="uniform_required" label="着装要求" min-width="150" />
-      <el-table-column label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="isEventExpired(row.time) ? 'info' : 'success'">
-            {{ isEventExpired(row.time) ? '已结束' : '进行中' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="280" fixed="right">
-        <template #default="{ row }">
-          <!-- 报名按钮 -->
-          <el-button
-            v-if="!row.is_registered && !isEventExpired(row.time)"
-            type="success"
-            size="small"
-            @click="registerEvent(row)"
-          >
-            报名
-          </el-button>
-          <el-button
-            v-else-if="row.is_registered && !isEventExpired(row.time)"
-            type="danger"
-            size="small"
-            @click="cancelRegistration(row)"
-          >
-            取消报名
-          </el-button>
-          <el-button
-            v-else
-            type="info"
-            size="small"
-            disabled
-          >
-            {{ row.is_registered ? '已报名' : '报名' }}
-          </el-button>
-          <!-- 管理员操作按钮 -->
-          <el-button type="primary" link v-if="userStore.userInfo?.role === 'admin'" @click="showEditDialog(row)">编辑</el-button>
-          <el-button type="danger" link v-if="userStore.userInfo?.role === 'admin'" @click="handleDelete(row)">删除</el-button>
-          <el-button type="info" link v-if="userStore.userInfo?.role === 'admin'" @click="showRegistrations(row)">查看报名</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <div class="pagination-container" style="margin-top: 20px; text-align: right;">
+    <div class="pagination-container">
       <el-pagination
         v-model:current-page="pagination.currentPage"
         v-model:page-size="pagination.pageSize"
@@ -79,6 +85,8 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑活动' : '创建活动'"
       width="500px"
+      @close="resetForm"
+      :body-style="{ padding: '20px 60px' }"
     >
       <el-form
         ref="formRef"
@@ -87,27 +95,30 @@
         label-width="100px"
       >
         <el-form-item label="活动名称" prop="name">
-          <el-input v-model="form.name" />
+          <el-input v-model="form.name" placeholder="请输入活动名称" />
         </el-form-item>
-        <el-form-item label="地点" prop="location" required>
+        <el-form-item label="活动地点" prop="location">
           <el-input v-model="form.location" placeholder="请输入活动地点" />
         </el-form-item>
-        <el-form-item label="时间" prop="time">
+        <el-form-item label="活动时间" prop="time">
           <el-date-picker
             v-model="form.time"
             type="datetime"
-            placeholder="选择日期时间"
-            format="YYYY-MM-DD HH:mm"
+            placeholder="选择活动时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
           />
         </el-form-item>
         <el-form-item label="着装要求" prop="uniform_required">
-          <el-input v-model="form.uniform_required" />
+          <el-input v-model="form.uniform_required" placeholder="请输入着装要求" />
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">确定</el-button>
+          <el-button type="primary" @click="handleSubmit">
+            {{ isEdit ? '保存' : '创建' }}
+          </el-button>
         </span>
       </template>
     </el-dialog>
@@ -145,6 +156,7 @@ import type { FormInstance } from 'element-plus'
 import { useUserStore } from '../stores/user'
 import request from '../utils/request'
 import { useRouter } from 'vue-router'
+import { Plus, Location, Timer, Umbrella } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -217,7 +229,7 @@ const formatTime = (time: string) => {
   })
 }
 
-const fetchEvents = async () => {
+const fetchEvents = async (page = 1, limit = 10) => {
   if (!userStore.getToken()) {
     ElMessage.warning('请先登录')
     router.push('/login')
@@ -226,14 +238,19 @@ const fetchEvents = async () => {
 
   loading.value = true
   try {
-    const response = await request.get('/events/')
+    const response = await request.get('/events/', {
+      params: {
+        page: page,
+        per_page: limit,
+      }
+    })
     if (response.data?.items) {
-      const { items, total, current_page, pages } = response.data
+      const { items, total, current_page, per_page, pages } = response.data
       events.value = items
       pagination.value = {
         total,
         currentPage: current_page,
-        pageSize: 10,
+        pageSize: per_page,
         pageCount: pages
       }
     }
@@ -257,7 +274,7 @@ const registerEvent = async (event: Event) => {
     
     if (response.code === 201) {
       ElMessage.success(response.msg || '报名成功')
-      await fetchEvents()  // 重新获取活动列表以更新状态
+      await fetchEvents(pagination.value.currentPage, pagination.value.pageSize)  // 重新获取活动列表以更新状态
     } else {
       ElMessage.error(response.msg || '报名失败')
     }
@@ -270,7 +287,7 @@ const registerEvent = async (event: Event) => {
     } else {
       ElMessage.error(error.message || error.response?.data?.msg || '报名失败')
     }
-    await fetchEvents() // 发生错误时也刷新一下列表
+    await fetchEvents(pagination.value.currentPage, pagination.value.pageSize) // 发生错误时也刷新一下列表
   }
 }
 
@@ -282,7 +299,7 @@ const cancelRegistration = async (event: Event) => {
     
     if (response.code === 200) {
       ElMessage.success(response.msg || '取消报名成功')
-      await fetchEvents()  // 重新获取活动列表以更新状态
+      await fetchEvents(pagination.value.currentPage, pagination.value.pageSize)  // 重新获取活动列表以更新状态
     } else {
       ElMessage.error(response.msg || '取消报名失败')
     }
@@ -327,6 +344,20 @@ const showEditDialog = (row: Event) => {
   dialogVisible.value = true
 }
 
+const resetForm = () => {
+  isEdit.value = false;
+  form.value = {
+    name: '',
+    time: new Date(),
+    uniform_required: '',
+    trainings: [],
+    location: ''
+  };
+  if (formRef.value) {
+    formRef.value.resetFields();
+  }
+};
+
 const handleSubmit = async () => {
   if (!formRef.value) return
   
@@ -362,7 +393,7 @@ const handleSubmit = async () => {
     }
     
     dialogVisible.value = false
-    fetchEvents()
+    fetchEvents(pagination.value.currentPage, pagination.value.pageSize)
   } catch (error: any) {
     console.error('提交表单失败:', error)
     if (error.response?.status === 403) {
@@ -386,7 +417,7 @@ const handleDelete = async (row: Event) => {
     
     await request.delete(`/events/${row.event_id}`)
     ElMessage.success('删除成功')
-    fetchEvents()
+    fetchEvents(pagination.value.currentPage, pagination.value.pageSize)
   } catch (error: any) {
     if (error === 'cancel') return
     console.error('删除失败:', error)
@@ -432,14 +463,13 @@ const showRegistrations = async (row: Event) => {
 // 处理页码变化
 const handleCurrentChange = (page: number) => {
   pagination.value.currentPage = page
-  fetchEvents()
+  fetchEvents(page, pagination.value.pageSize)
 }
 
 // 处理每页条数变化
 const handleSizeChange = (size: number) => {
   pagination.value.pageSize = size
-  pagination.value.currentPage = 1
-  fetchEvents()
+  fetchEvents(pagination.value.currentPage, size)
 }
 
 onMounted(async () => {
@@ -464,29 +494,75 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.events {
+.events-container {
   padding: 20px;
 }
 
-.header {
+.header-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
 
-.header h2 {
+.page-title {
   margin: 0;
+  font-size: 24px;
 }
 
-.dialog-footer {
+.content-area {
+  margin-top: 20px;
+}
+
+.event-col {
+  margin-bottom: 20px;
+}
+
+.event-card {
+  height: 100%;
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  flex-direction: column;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+}
+
+.card-body p {
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #606266;
+}
+
+.card-body p .el-icon {
+  color: #409EFF;
+}
+
+.card-footer {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid #ebeef5;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 5px;
 }
 
 .pagination-container {
+  display: flex;
+  justify-content: flex-end;
   margin-top: 20px;
-  text-align: right;
 }
 </style> 

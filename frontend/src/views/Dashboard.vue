@@ -1,8 +1,8 @@
 <template>
   <div class="dashboard">
     <!-- 统计卡片 -->
-    <el-row :gutter="20">
-      <el-col :span="5">
+    <el-row :gutter="20" class="stat-row">
+      <el-col>
         <el-card shadow="hover" class="stat-card">
           <div class="stat-icon"><User /></div>
           <div class="stat-content">
@@ -11,7 +11,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="5">
+      <el-col>
         <el-card shadow="hover" class="stat-card">
           <div class="stat-icon"><Calendar /></div>
           <div class="stat-content">
@@ -20,7 +20,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="4">
+      <el-col>
         <el-card shadow="hover" class="stat-card">
           <div class="stat-icon"><Clock /></div>
           <div class="stat-content">
@@ -29,16 +29,16 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="5">
+      <el-col>
         <el-card shadow="hover" class="stat-card">
-           <div class="stat-icon"><Star /></div>
+           <div class="stat-icon"><Trophy /></div>
           <div class="stat-content">
             <div class="stat-title">活动总数</div>
             <div class="stat-value">{{ dashboardStore.stats.total_events }}</div>
           </div>
         </el-card>
       </el-col>
-      <el-col :span="5">
+      <el-col>
         <el-card shadow="hover" class="stat-card">
           <div class="stat-icon"><Star /></div>
           <div class="stat-content">
@@ -52,7 +52,7 @@
     <!-- 待审核记录和最近活动 -->
     <el-row :gutter="20" class="mt-20">
       <el-col :span="12">
-        <el-card shadow="hover" class="list-card">
+        <el-card shadow="hover">
           <template #header>
             <div class="card-header">
               <span>待审核记录</span>
@@ -84,8 +84,10 @@
           <el-table :data="dashboardStore.recentEvents" style="width: 100%" v-loading="dashboardStore.loading">
             <el-table-column prop="name" label="活动名称" />
             <el-table-column prop="location" label="地点" />
-            <el-table-column prop="time" label="时间">
-              <template #default="{ row }">{{ formatDateTime(row.time) }}</template>
+            <el-table-column prop="time" label="活动时间">
+              <template #default="{ row }">
+                {{ formatActivityTime(row.time) }}
+              </template>
             </el-table-column>
             <el-table-column prop="status" label="状态">
               <template #default="{ row }">
@@ -103,7 +105,7 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDashboardStore } from '../stores/dashboard'
-import { User, Calendar, Clock, Star } from '@element-plus/icons-vue'
+import { User, Calendar, Clock, Star, Trophy } from '@element-plus/icons-vue'
 import { formatDateTime } from '../utils/format'
 
 const router = useRouter()
@@ -134,6 +136,13 @@ const viewAllEvents = () => {
   router.push('/events')
 }
 
+const formatActivityTime = (timeStr: string) => {
+  if (!timeStr) return '';
+  const date = new Date(timeStr);
+  // Add 8 hours for timezone adjustment
+  date.setHours(date.getHours() + 8);
+  return date.toISOString().replace('T', ' ').substring(0, 16);
+};
 
 onMounted(() => {
   dashboardStore.fetchDashboardData()
@@ -141,31 +150,48 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.text-fix {
+  position: relative;
+  top: 6px;
+}
 .dashboard {
   padding: 20px;
 }
+.stat-row {
+  display: flex;
+}
+.stat-row > .el-col {
+  flex: 1;
+}
 .mt-20 {
-  margin-top: 20px;
+  margin-top: 40px;
 }
 .stat-card {
   display: flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
   padding: 16px;
   color: #fff;
   border-radius: 8px;
+  height: 100%;
 }
-.stat-card:nth-child(5n+1) { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-.stat-card:nth-child(5n+2) { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
-.stat-card:nth-child(5n+3) { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); }
-.stat-card:nth-child(5n+4) { background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); }
-.stat-card:nth-child(5n+5) { background: linear-gradient(135deg, #5ee7df 0%, #b490ca 100%); }
+.stat-card:nth-child(5n+1) { background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%); }
+.stat-card:nth-child(5n+2) { background: linear-gradient(135deg, #FAD961 0%, #F76B1C 100%); }
+.stat-card:nth-child(5n+3) { background: linear-gradient(135deg, #EA4C89 0%, #F47C7C 100%); }
+.stat-card:nth-child(5n+4) { background: linear-gradient(135deg, #89216B 0%, #DA4453 100%); }
+.stat-card:nth-child(5n+5) { background: linear-gradient(135deg, #16A085 0%, #F4D03F 100%); }
 .stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
   font-size: 36px;
-  margin-right: 16px;
+  margin-bottom: 12px;
   opacity: 0.8;
 }
 .stat-content {
-  text-align: right;
+  text-align: center;
 }
 .stat-title {
   font-size: 14px;
@@ -180,8 +206,5 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-.list-card :deep(.el-card__body) {
-  padding: 0;
 }
 </style> 

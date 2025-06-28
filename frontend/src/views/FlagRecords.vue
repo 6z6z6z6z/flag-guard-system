@@ -1,13 +1,76 @@
 <template>
   <div class="flag-records-container">
-    <!-- 提交升降旗记录表单 -->
-    <el-card class="submit-card">
-      <template #header>
-        <div class="card-header">
-          <h3>提交升降旗记录</h3>
-        </div>
-      </template>
+    <div class="header-controls">
+      <h1 class="page-title">升降旗记录</h1>
+      <div class="actions">
+        <el-radio-group v-model="filterStatus" @change="fetchRecords" class="filter-buttons">
+          <el-radio-button label="">全部</el-radio-button>
+          <el-radio-button label="pending">待审核</el-radio-button>
+          <el-radio-button label="approved">已通过</el-radio-button>
+          <el-radio-button label="rejected">已拒绝</el-radio-button>
+        </el-radio-group>
+        <el-button type="primary" :icon="Plus" @click="showSubmitDialog">
+          上传记录
+        </el-button>
+      </div>
+    </div>
+    <el-divider></el-divider>
+    <div class="content-area" v-loading="loading">
+      <el-row :gutter="20" v-if="records.length > 0">
+        <el-col :xs="24" :sm="12" :md="8" v-for="record in records" :key="record.record_id" class="record-col">
+          <el-card class="record-card" shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <span class="record-date">{{ formatDate(record.date) }}</span>
+                <el-tag :type="getStatusType(record.status)">
+                  {{ getStatusText(record.status) }}
+                </el-tag>
+              </div>
+            </template>
+            <div class="card-body">
+              <p><el-icon><Flag /></el-icon> <strong>类型：</strong> {{ record.type === 'raise' ? '升旗' : '降旗' }}</p>
+              <p v-if="userStore.isAdmin"><el-icon><User /></el-icon> <strong>提交人：</strong> {{ record.user?.name || 'N/A' }}</p>
+              <p><el-icon><Star /></el-icon> <strong>积分：</strong> {{ record.status === 'approved' ? record.points_awarded : '-' }}</p>
+              <p><el-icon><Picture /></el-icon> <strong>照片：</strong>
+                <el-button
+                  type="primary"
+                  link
+                  @click="handlePreview(getImageUrl(record.photo_url))"
+                  style="margin-left: 8px;"
+                >
+                  查看照片
+                </el-button>
+              </p>
+            </div>
+            <div class="card-footer" v-if="userStore.isAdmin && record.status === 'pending'">
+              <el-button type="success" size="small" @click="handleApprove(record)" round>通过</el-button>
+              <el-button type="danger" size="small" @click="handleReject(record)" round>拒绝</el-button>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+      <el-empty v-else description="暂无记录"></el-empty>
+    </div>
 
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
+
+    <!-- 提交记录对话框 -->
+    <el-dialog
+      v-model="submitDialogVisible"
+      title="提交升降旗记录"
+      width="500px"
+      @close="resetForm"
+    >
       <el-form
         ref="formRef"
         :model="flagForm"
@@ -22,13 +85,14 @@
             placeholder="选择日期"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
+            style="width: 100%"
           />
         </el-form-item>
         
         <el-form-item label="类型" prop="type">
           <el-radio-group v-model="flagForm.type">
-            <el-radio :value="'raise'">升旗</el-radio>
-            <el-radio :value="'lower'">降旗</el-radio>
+            <el-radio value="raise">升旗</el-radio>
+            <el-radio value="lower">降旗</el-radio>
           </el-radio-group>
         </el-form-item>
         
@@ -47,129 +111,27 @@
               </div>
             </template>
           </el-upload>
-          <div v-if="flagForm.photo_url" class="preview-image">
+          <div v-if="flagForm.photo_url" class="preview-image-dialog">
             <img :src="getImageUrl(flagForm.photo_url)" alt="预览图" />
           </div>
         </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="submitRecord" :loading="submitting">
-            提交记录
-          </el-button>
-        </el-form-item>
       </el-form>
-    </el-card>
-
-    <!-- 历史记录列表 -->
-    <el-card class="history-card">
-      <template #header>
-        <div class="card-header">
-          <h3>历史记录</h3>
-          <el-radio-group v-model="filterStatus" @change="fetchRecords">
-            <el-radio-button :value="'all'">全部</el-radio-button>
-            <el-radio-button :value="'pending'">待审核</el-radio-button>
-            <el-radio-button :value="'approved'">已通过</el-radio-button>
-            <el-radio-button :value="'rejected'">已拒绝</el-radio-button>
-          </el-radio-group>
-        </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="submitDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitRecord" :loading="submitting">
+            提交
+          </el-button>
+        </span>
       </template>
+    </el-dialog>
 
-      <el-table :data="records" style="width: 100%">
-        <el-table-column prop="date" label="日期" width="120">
-          <template #default="scope">
-            {{ formatDate(scope.row.date) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="type" label="类型" width="100">
-          <template #default="scope">
-            {{ scope.row.type === 'raise' ? '升旗' : '降旗' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)">
-              {{ getStatusText(scope.row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="points_awarded" label="获得积分" width="100">
-          <template #default="scope">
-            <span v-if="scope.row.status === 'approved'">
-              {{ scope.row.points_awarded }}
-            </span>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="照片" width="120">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              @click="handlePreview(row.photo_url)"
-            >
-              查看照片
-            </el-button>
-          </template>
-        </el-table-column>
-        <el-table-column prop="reviewed_at" label="审核时间" width="180">
-          <template #default="scope">
-            {{ scope.row.reviewed_at ? formatDateTime(scope.row.reviewed_at) : '-' }}
-          </template>
-        </el-table-column>
-        <!-- 添加提交者信息列 -->
-        <el-table-column v-if="userStore.isAdmin" label="提交者" width="180">
-          <template #default="scope">
-            {{ scope.row.user?.name }} ({{ scope.row.user?.student_id }})
-          </template>
-        </el-table-column>
-        <!-- 添加审核操作列 -->
-        <el-table-column v-if="userStore.isAdmin" label="操作" width="150" fixed="right">
-          <template #default="scope">
-            <el-button
-              v-if="scope.row.status === 'pending'"
-              type="success"
-              size="small"
-              @click="handleApprove(scope.row)"
-            >
-              通过
-            </el-button>
-            <el-button
-              v-if="scope.row.status === 'pending'"
-              type="danger"
-              size="small"
-              @click="handleReject(scope.row)"
-            >
-              拒绝
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="pagination">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          :total="total"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </el-card>
-
-    <el-dialog
-      v-model="previewVisible"
-      title="照片预览"
-      width="50%"
-      :append-to-body="true"
-      :modal-append-to-body="true"
-      :destroy-on-close="true"
-      :z-index="3000"
-    >
-      <div class="preview-container">
-        <img :src="previewUrl" alt="预览图片" class="preview-image" />
-      </div>
+    <el-dialog v-model="previewVisible" title="照片预览" width="600px" center :body-style="{ padding: '0' }">
+      <el-image
+        style="width: 100%; height: auto;"
+        :src="previewUrl"
+        fit="contain"
+      />
     </el-dialog>
   </div>
 </template>
@@ -180,12 +142,13 @@ import type { FormInstance, FormRules, UploadProps } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import request from '../utils/request'
 import { useUserStore } from '../stores/user'
+import { Plus, Flag, User, Star, Picture } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
-
-// 照片预览相关
+const submitDialogVisible = ref(false)
+const loading = ref(true)
 const previewVisible = ref(false)
 const previewUrl = ref('')
 
@@ -210,27 +173,45 @@ const rules: FormRules = {
 }
 
 // 历史记录相关
-const records = ref([])
+const records = ref<any[]>([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const filterStatus = ref('all')
 
+const showSubmitDialog = () => {
+  resetForm();
+  submitDialogVisible.value = true;
+};
+
+const resetForm = () => {
+  if(formRef.value) {
+    formRef.value.resetFields();
+  }
+  flagForm.value = {
+    date: '',
+    type: 'raise',
+    photo_url: ''
+  };
+};
+
+const handlePreview = (url: string) => {
+  previewUrl.value = url;
+  previewVisible.value = true;
+};
+
 // 获取图片URL
 const getImageUrl = (url: string) => {
   if (!url) return ''
   if (url.startsWith('http')) return url
-
   // 后端返回的URL是 /api/uploads/xxx.jpg
   // 我们需要把它变成 /uploads/xxx.jpg 以便代理
   if (url.startsWith('/api/uploads/')) {
     return url.substring(4) // 去掉 /api
   }
-  
   if (url.startsWith('/uploads/')) {
     return url
   }
-
   // 对于历史数据，可能没有前缀
   return `/uploads/${url.split('/').pop()}`
 }
@@ -252,44 +233,39 @@ const beforeUpload: UploadProps['beforeUpload'] = (file) => {
 }
 
 const customUpload = async (options: any) => {
+  const formData = new FormData()
+  formData.append('file', options.file)
+
   try {
-    const formData = new FormData()
-    formData.append('file', options.file)
-    
     const response = await request.post('/files/files/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
-    })
-    
+    });
+
     if (response.data && response.data.url) {
-      flagForm.value.photo_url = response.data.url
-      ElMessage.success('上传成功')
+      flagForm.value.photo_url = response.data.url;
+      ElMessage.success('上传成功');
     } else {
-      ElMessage.error('上传失败')
+      ElMessage.error(response.msg || '上传失败');
     }
   } catch (error: any) {
-    console.error('Upload error:', error)
-    ElMessage.error(error.response?.data?.error || '上传失败')
+    ElMessage.error(error.response?.data?.msg || '上传请求失败');
   }
 }
 
 // 提交记录
 const submitRecord = async () => {
   if (!formRef.value) return
-  
   await formRef.value.validate(async (valid) => {
     if (valid) {
       submitting.value = true
       try {
         const response = await request.post('/flag/records', flagForm.value)
-        if (response.code === 200) {
-          ElMessage.success(response.msg || '提交成功')
-          // 重置表单
-          formRef.value?.resetFields()
-          flagForm.value.photo_url = ''
-          // 刷新历史记录
-          await fetchRecords()
+        if (response.code === 201 || response.code === 200) {
+          ElMessage.success('提交成功，等待审核')
+          submitDialogVisible.value = false;
+          fetchRecords()
         } else {
           ElMessage.error(response.msg || '提交失败')
         }
@@ -302,48 +278,80 @@ const submitRecord = async () => {
   })
 }
 
-// 获取记录列表
+// 获取历史记录
 const fetchRecords = async () => {
+  loading.value = true;
   try {
-    console.log('Starting fetchRecords')
-    console.log('Current user info:', userStore.userInfo)
-    console.log('Is admin:', userStore.isAdmin)
-    
-    const params: {
-      page: number;
-      per_page: number;
-      status?: string;
-    } = {
+    const params = {
       page: currentPage.value,
-      per_page: pageSize.value
+      per_page: pageSize.value,
+      status: filterStatus.value === 'all' ? undefined : filterStatus.value,
     }
-    if (filterStatus.value !== 'all') {
-      params.status = filterStatus.value
-    }
-    
-    // 根据用户角色选择不同的API端点
-    const endpoint = userStore.isAdmin ? '/flag/records/review' : '/flag/records'
-    console.log('Fetching records from endpoint:', endpoint, 'with params:', params)
-    
+    const endpoint = userStore.isAdmin ? '/flag/records/review' : '/flag/records';
     const response = await request.get(endpoint, { params })
-    console.log('Response:', response)
-    
-    if (response && response.data) {
-      records.value = response.data.items || []
-      total.value = response.data.total || 0
-      console.log('Updated records:', records.value)
-      console.log('Total records:', total.value)
-    } else {
-      console.error('Invalid response format:', response)
-      ElMessage.error('获取记录失败：响应格式错误')
+    if (response.data) {
+      records.value = response.data.items
+      total.value = response.data.total
     }
   } catch (error: any) {
-    console.error('Error fetching records:', error)
-    ElMessage.error(error.message || '获取记录失败')
+    ElMessage.error(error.response?.data?.msg || '获取记录失败')
+  } finally {
+    loading.value = false;
   }
 }
 
-// 分页处理
+// 状态标签类型
+const getStatusType = (status: string) => {
+  switch (status) {
+    case 'pending': return 'warning'
+    case 'approved': return 'success'
+    case 'rejected': return 'error'
+    default: return 'info'
+  }
+}
+
+// 状态文本
+const getStatusText = (status: string) => {
+  switch (status) {
+    case 'pending': return '待审核'
+    case 'approved': return '已通过'
+    case 'rejected': return '已拒绝'
+    default: return '未知'
+  }
+}
+
+// 格式化日期
+const formatDate = (dateString: string) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
+// 审核相关方法
+const handleApprove = async (row: any) => {
+  try {
+    await request.post(`/flag/records/${row.record_id}/approve`);
+    ElMessage.success('审核通过');
+    fetchRecords();
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '操作失败');
+  }
+};
+
+const handleReject = async (row: any) => {
+  try {
+    await request.post(`/flag/records/${row.record_id}/reject`);
+    ElMessage.success('操作成功');
+    fetchRecords();
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.msg || '操作失败');
+  }
+};
+
 const handleSizeChange = (val: number) => {
   pageSize.value = val
   fetchRecords()
@@ -352,78 +360,6 @@ const handleSizeChange = (val: number) => {
 const handleCurrentChange = (val: number) => {
   currentPage.value = val
   fetchRecords()
-}
-
-// 格式化日期
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  // 添加8小时时区偏移
-  date.setHours(date.getHours() + 8)
-  return date.toLocaleDateString()
-}
-
-const formatDateTime = (dateStr: string) => {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  // 添加8小时时区偏移
-  date.setHours(date.getHours() + 8)
-  return date.toLocaleString()
-}
-
-// 获取状态标签类型
-const getStatusType = (status: string) => {
-  const typeMap: Record<string, string> = {
-    pending: 'warning',
-    approved: 'success',
-    rejected: 'danger'
-  }
-  return typeMap[status] || 'info'
-}
-
-// 获取状态文本
-const getStatusText = (status: string) => {
-  const textMap: Record<string, string> = {
-    pending: '待审核',
-    approved: '已通过',
-    rejected: '已拒绝'
-  }
-  return textMap[status] || status
-}
-
-// 审核相关方法
-const handleApprove = async (record: any) => {
-  try {
-    const response = await request.post(`/flag/records/${record.record_id}/approve`)
-    if (response.code === 200) {
-      ElMessage.success(response.msg || '审核通过成功')
-      await fetchRecords()
-    } else {
-      ElMessage.error(response.msg || '审核失败')
-    }
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.msg || '审核失败')
-  }
-}
-
-const handleReject = async (record: any) => {
-  try {
-    const response = await request.post(`/flag/records/${record.record_id}/reject`)
-    if (response.code === 200) {
-      ElMessage.success(response.msg || '已拒绝该记录')
-      await fetchRecords()
-    } else {
-      ElMessage.error(response.msg || '操作失败')
-    }
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.msg || '操作失败')
-  }
-}
-
-// 预览照片
-const handlePreview = (url: string) => {
-  previewUrl.value = getImageUrl(url)
-  previewVisible.value = true
 }
 
 onMounted(() => {
@@ -436,9 +372,39 @@ onMounted(() => {
   padding: 20px;
 }
 
-.submit-card,
-.history-card {
+.header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0; /* Adjusted to use divider for spacing */
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+}
+
+.filter-buttons {
+  margin-right: 16px;
+}
+
+.content-area {
+  margin-top: 0;
+}
+
+.record-col {
   margin-bottom: 20px;
+}
+
+.record-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .card-header {
@@ -447,43 +413,53 @@ onMounted(() => {
   align-items: center;
 }
 
-.card-header h3 {
-  margin: 0;
+.record-date {
+  font-weight: bold;
 }
 
-.preview-image {
-  margin-top: 10px;
+.card-body {
+  flex-grow: 1;
 }
 
-.preview-image img {
-  max-width: 200px;
-  max-height: 200px;
-  object-fit: contain;
+.card-body p {
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #606266;
 }
 
-.table-image {
-  width: 80px;
-  height: 60px;
-  cursor: pointer;
+.card-body p .el-icon {
+  color: #409EFF;
 }
 
-.pagination {
-  margin-top: 20px;
+.card-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid #ebeef5;
 }
 
-.preview-container {
+.pagination-container {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
+  justify-content: flex-end;
+  margin-top: 20px;
 }
 
-.preview-image {
-  max-width: 100%;
-  max-height: 70vh;
-  object-fit: contain;
+.preview-image-dialog {
+  margin-top: 10px;
+  max-width: 200px;
+  max-height: 200px;
 }
-</style> 
+
+.preview-image-dialog img {
+  width: 100%;
+  height: auto;
+}
+
+.add-button {
+  /* Style for the add button if needed */
+}
+</style>

@@ -79,12 +79,17 @@ def register():
         return APIResponse.error("Student ID already exists", 400)
     
     try:
+        # 检查是否是第一个用户
+        is_first_user = User.query.first() is None
+        
+        user_role = 'superadmin' if is_first_user else 'member'
+
         user = User(
             username=data['username'],
             name=data['name'],
             student_id=data['student_id'],
             college=data['college'],
-            role=data.get('role', 'member'),
+            role=user_role,
             phone_number=data.get('phone_number')
         )
         if not user.set_password(data['password']):
@@ -240,7 +245,10 @@ def get_user_info():
             'college': user.college,
             'student_id': user.student_id,
             'phone_number': user.phone_number,
-            'total_points': user.total_points
+            'total_points': user.total_points,
+            'height': user.height,
+            'weight': user.weight,
+            'shoe_size': user.shoe_size
         }
         return APIResponse.success(data=user_data)
     except Exception as e:

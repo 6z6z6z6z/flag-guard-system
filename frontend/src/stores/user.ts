@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import request from '../utils/request'
 
 // 定义用户信息接口
-interface UserInfo {
+export interface UserInfo {
   id: number
   username: string
   name: string

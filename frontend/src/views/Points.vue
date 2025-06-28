@@ -1,66 +1,63 @@
 <template>
   <div class="points-container">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <h3>积分记录</h3>
-          <div class="filter-group">
-            <el-select v-model="filterType" placeholder="选择类型" clearable @change="fetchPointHistory">
-              <el-option label="升降旗" value="flag" />
-              <el-option label="训练" value="training" />
-              <el-option label="活动" value="event" />
-            </el-select>
-          </div>
-        </div>
-      </template>
-
-      <div class="points-summary">
-        <el-descriptions :column="3" border>
-          <el-descriptions-item label="当前总积分">
-            <span class="total-points">{{ totalPoints }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="本月获得积分">
-            <span class="monthly-points">{{ monthlyPoints }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="上月获得积分">
-            <span class="last-monthly-points">{{ lastMonthPoints }}</span>
-          </el-descriptions-item>
-        </el-descriptions>
+    <div class="header-controls">
+      <h1 class="page-title">积分记录</h1>
+      <div class="filter-group">
+        <el-select v-model="filterType" placeholder="选择类型" clearable @change="fetchPointHistory">
+          <el-option label="升降旗" value="flag" />
+          <el-option label="训练" value="training" />
+          <el-option label="活动" value="event" />
+        </el-select>
       </div>
+    </div>
+    <el-divider />
 
-      <el-table :data="pointHistory" style="width: 100%; margin-top: 20px">
-        <el-table-column prop="change_time" label="时间" width="180">
-          <template #default="scope">
-            {{ formatDateTime(scope.row.change_time) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="change_type" label="类型" width="120">
-          <template #default="scope">
-            {{ getChangeTypeText(scope.row.change_type) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="points_change" label="积分变动" width="120">
-          <template #default="scope">
-            <span :class="scope.row.points_change >= 0 ? 'positive' : 'negative'">
-              {{ scope.row.points_change >= 0 ? '+' : '' }}{{ scope.row.points_change }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="description" label="说明" />
-      </el-table>
+    <div class="points-summary">
+      <el-descriptions :column="3" border>
+        <el-descriptions-item label="当前总积分">
+          <span class="total-points">{{ totalPoints }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="本月获得积分">
+          <span class="monthly-points">{{ monthlyPoints }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="上月获得积分">
+          <span class="last-monthly-points">{{ lastMonthPoints }}</span>
+        </el-descriptions-item>
+      </el-descriptions>
+    </div>
 
-      <div class="pagination">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          :total="total"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </el-card>
+    <el-table :data="pointHistory" style="width: 100%; margin-top: 20px">
+      <el-table-column prop="change_time" label="时间" width="180">
+        <template #default="scope">
+          {{ formatDateTime(scope.row.change_time) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="change_type" label="类型" width="120">
+        <template #default="scope">
+          {{ getChangeTypeText(scope.row.change_type) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="points_change" label="积分变动" width="120">
+        <template #default="scope">
+          <span :class="scope.row.points_change >= 0 ? 'positive' : 'negative'">
+            {{ scope.row.points_change >= 0 ? '+' : '' }}{{ scope.row.points_change }}
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="description" label="说明" />
+    </el-table>
+
+    <div class="pagination">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
   </div>
 </template>
 
@@ -178,13 +175,15 @@ onMounted(() => {
   padding: 20px;
 }
 
-.card-header {
+.header-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 20px;
 }
 
-.card-header h3 {
+.page-title {
+  font-size: 24px;
   margin: 0;
 }
 

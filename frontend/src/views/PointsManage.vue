@@ -1,13 +1,11 @@
 <template>
   <div class="points-manage-container">
     <!-- 手动调整积分表单 -->
-    <el-card class="adjust-card">
-      <template #header>
-        <div class="card-header">
-          <h3>积分调整</h3>
-        </div>
-      </template>
-
+    <div class="header-controls">
+      <h1 class="page-title">积分调整</h1>
+    </div>
+    <el-divider />
+    <div class="form-area">
       <el-form
         ref="formRef"
         :model="adjustForm"
@@ -67,7 +65,7 @@
           </el-button>
         </el-form-item>
       </el-form>
-    </el-card>
+    </div>
 
     <!-- 积分调整历史记录 -->
     <el-card class="history-card">
@@ -298,9 +296,31 @@ onMounted(() => {
   padding: 20px;
 }
 
-.adjust-card,
-.history-card {
+.header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 24px;
+  margin: 0;
+}
+
+.form-area {
+  padding-bottom: 20px;
+  max-width: 600px;
+}
+
+.points-tip {
+  margin-left: 10px;
+  color: #909399;
+  font-size: 12px;
+}
+
+.history-card {
+  margin-top: 20px;
 }
 
 .card-header {
@@ -311,12 +331,6 @@ onMounted(() => {
 
 .card-header h3 {
   margin: 0;
-}
-
-.points-tip {
-  margin-left: 10px;
-  color: #909399;
-  font-size: 14px;
 }
 
 .positive {

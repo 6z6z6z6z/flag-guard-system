@@ -196,7 +196,7 @@ def search_users():
 
 @users_bp.route('/points/all', methods=['GET'])
 @jwt_required()
-@role_required('admin')
+@role_required('superadmin', 'admin')
 @handle_exceptions
 @log_operation('get_all_users_points')
 def get_all_users_points():
@@ -252,7 +252,7 @@ def get_all_users_points():
 
 @users_bp.route('', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('superadmin')
 @validate_json_request
 @handle_exceptions
 @log_operation('create_user')
@@ -313,6 +313,11 @@ def create_user():
         if not is_valid:
             return APIResponse.error(error_msg, 400)
     
+    # 检查角色是否有效
+    role = data.get('role', 'member')
+    if role not in ['admin', 'member']:
+        return APIResponse.error(f"Invalid role: {role}", 400)
+    
     # 检查用户名是否已存在
     if User.query.filter_by(username=data['username']).first():
         return APIResponse.error("Username already exists", 400)
@@ -348,7 +353,7 @@ def create_user():
 
 @users_bp.route('/<int:user_id>/role', methods=['PUT'])
 @jwt_required()
-@role_required('admin')
+@role_required('superadmin')
 @validate_json_request
 @handle_exceptions
 @log_operation('update_user_role')
@@ -396,8 +401,16 @@ def update_user_role(user_id):
     if not user:
         return APIResponse.error("User not found", 404)
     
+    new_role = data.get('role')
+    if not new_role or new_role not in ['admin', 'member']:
+        return APIResponse.error("Invalid or missing role. Can only set to 'admin' or 'member'.", 400)
+    
+    # 防止最后一个超级管理员将自己降级
+    if user.user_id == get_jwt_identity() and user.role == 'superadmin' and new_role != 'superadmin':
+        return APIResponse.error("Superadmin cannot demote themselves.", 400)
+
     try:
-        user.role = data['role']
+        user.role = new_role
         db.session.commit()
         return APIResponse.success(data=user.to_dict())
     except Exception as e:
@@ -407,7 +420,7 @@ def update_user_role(user_id):
 
 @users_bp.route('/<int:user_id>', methods=['PUT'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
 @log_operation('update_user')
@@ -451,23 +464,16 @@ def update_user(user_id):
     
     if not user:
         return APIResponse.error("User not found", 404)
-    
-    # 验证手机号格式
-    if data.get('phone_number'):
-        is_valid, error_msg = validate_phone_number(data['phone_number'])
-        if not is_valid:
-            return APIResponse.error(error_msg, 400)
-    
-    try:
-        # 更新允许的字段
-        allowed_fields = {'name', 'college', 'phone_number'}
-        for field in allowed_fields:
-            if field in data:
-                setattr(user, field, data[field])
+
+    # 如果有角色变更，则拒绝，因为此端点不能用于更改角色
+    if 'role' in data and data['role'] != user.role:
+        return APIResponse.error("Cannot change role via this endpoint. Use the dedicated /role endpoint.", 403)
         
-        db.session.commit()
-        return APIResponse.success(data=user.to_dict())
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error updating user: {str(e)}")
-        return APIResponse.error("Error updating user", 500) 
+    # 更新允许的字段
+    allowed_fields = ['username', 'name', 'student_id', 'college', 'phone_number']
+    for field in allowed_fields:
+        if field in data:
+            setattr(user, field, data[field])
+    
+    db.session.commit()
+    return APIResponse.success(data=user.to_dict()) 

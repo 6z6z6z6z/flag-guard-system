@@ -97,7 +97,7 @@ def get_point_history():
 
 @bp.route('/history/all')
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 @log_operation('get_all_point_history')
 def get_all_point_history():

@@ -1,12 +1,14 @@
 <template>
   <el-container class="layout-container">
-    <el-aside :width="isCollapse ? '64px' : '200px'">
+    <el-aside :width="isCollapse ? '64px' : '220px'">
       <div class="logo">
         <img src="/logo.png" alt="系统Logo" />
-        <div v-show="!isCollapse" class="logo-text">
-          <p>中国科学技术大学</p>
-          <p>校学生国旗护卫队</p>
-        </div>
+        <transition name="logo-fade">
+          <div v-if="!isCollapse" class="logo-text">
+            <p>中国科学技术大学</p>
+            <p>校学生国旗护卫队</p>
+          </div>
+        </transition>
       </div>
       <el-menu
         :default-active="$route.path"
@@ -16,45 +18,54 @@
       >
         <el-menu-item index="/dashboard" v-if="isAdmin">
           <el-icon><DataLine /></el-icon>
-          <template #title>仪表盘</template>
+          <template #title><span class="menu-title">仪表盘</span></template>
         </el-menu-item>
         <el-menu-item index="/events">
           <el-icon><Calendar /></el-icon>
-          <template #title>活动列表</template>
+          <template #title><span class="menu-title">活动列表</span></template>
         </el-menu-item>
         <el-menu-item index="/trainings">
           <el-icon><List /></el-icon>
-          <template #title>训练列表</template>
+          <template #title><span class="menu-title">训练列表</span></template>
         </el-menu-item>
         <el-menu-item index="/flag-records">
           <el-icon><Document /></el-icon>
-          <template #title>升降旗记录</template>
+          <template #title><span class="menu-title">升降旗记录</span></template>
         </el-menu-item>
         <el-menu-item index="/points">
           <el-icon><Star /></el-icon>
-          <template #title>积分记录</template>
+          <template #title><span class="menu-title">积分记录</span></template>
         </el-menu-item>
         <el-menu-item index="/points-manage" v-if="isAdmin">
           <el-icon><Edit /></el-icon>
-          <template #title>积分管理</template>
+          <template #title><span class="menu-title">积分管理</span></template>
         </el-menu-item>
         <el-menu-item index="/users" v-if="isAdmin">
-          <el-icon><User /></el-icon>
-          <template #title>用户管理</template>
+          <el-icon><Avatar /></el-icon>
+          <template #title><span class="menu-title">用户管理</span></template>
         </el-menu-item>
         <el-menu-item index="/profile">
           <el-icon><User /></el-icon>
-          <template #title>个人信息</template>
+          <template #title><span class="menu-title">个人信息</span></template>
         </el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
       <el-header>
-        <div class="header-content">
-          <h2>国旗护卫队管理系统</h2>
+        <div class="header-left">
+          <el-icon class="collapse-icon" @click="isCollapse = !isCollapse">
+            <component :is="isCollapse ? 'Expand' : 'Fold'" />
+          </el-icon>
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path" :to="item.path ? { path: item.path } : undefined">
+              {{ item.meta.title }}
+            </el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+        <div class="header-right">
           <el-dropdown @command="handleCommand">
             <span class="user-dropdown">
-              {{ userStore.userInfo?.name }}
+              <span class="user-name">{{ userStore.userInfo?.name }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -73,8 +84,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute, RouteLocationMatched } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import {
   DataLine,
@@ -84,16 +95,39 @@ import {
   ArrowDown,
   List,
   Star,
-  Edit
+  Edit,
+  Avatar,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const isCollapse = ref(false)
+const breadcrumbs = ref<RouteLocationMatched[]>([])
 
-// 计算属性：判断是否为管理员
+const getBreadcrumbs = () => {
+  const staticItem = { path: '', meta: { title: '国旗护卫队管理系统' } } as RouteLocationMatched
+
+  const matched = route.matched.filter(item => item.meta && item.meta.title)
+  
+  breadcrumbs.value = [staticItem, ...matched]
+}
+
+watch(
+  () => route.path,
+  () => {
+    getBreadcrumbs()
+  }
+)
+
+onMounted(() => {
+  getBreadcrumbs()
+})
+
+// 计算属性：判断是否为管理员或超级管理员
 const isAdmin = computed(() => {
-  return userStore.userInfo?.role === 'admin'
+  const role = userStore.userInfo?.role
+  return role === 'admin' || role === 'superadmin'
 })
 
 const handleCommand = (command: string) => {
@@ -110,37 +144,96 @@ const handleCommand = (command: string) => {
 }
 
 .el-aside {
-  background-color: #304156;
+  background-color: #f7f8fa;
+  border-right: 1px solid #e8e8e8;
+  transition: width 0.3s;
+}
+
+.el-menu-vertical:not(.el-menu--collapse) {
+  width: 220px;
 }
 
 .el-menu {
   border-right: none;
+  background-color: transparent;
+  margin-top: 10px;
+}
+
+.el-menu-item {
+  height: 50px;
+  line-height: 50px;
+  margin: 0 6px 0 2px;
+  border-radius: 6px;
+  color: #606266;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.el-menu-item .el-icon {
+  font-size: 18px;
+}
+
+.el-menu-item:hover {
+  background-color: #f0f2f5;
+  color: #2d8cf0;
+}
+
+.el-menu-item.is-active {
+  background-color: rgba(121, 187, 255, 0.15);
+  color: #79bbff;
+  font-weight: bold;
+}
+
+.el-menu-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 24px;
+  background-color: #79bbff;
+  border-radius: 2px;
 }
 
 .el-header {
   background-color: #fff;
-  border-bottom: 1px solid #dcdfe6;
+  border-bottom: 1px solid #e8e8e8;
   padding: 0 20px;
-}
-
-.header-content {
-  height: 60px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0 1px 4px rgba(0,21,41,.08);
 }
 
-.header-content h2 {
-  margin: 0;
-  font-size: 18px;
-  color: #303133;
+.header-left, .header-right {
+  display: flex;
+  align-items: center;
+}
+
+.collapse-icon {
+  font-size: 22px;
+  cursor: pointer;
+  margin-right: 15px;
+}
+
+.el-breadcrumb :deep(.el-breadcrumb__inner) {
+  font-weight: normal;
+}
+
+.el-breadcrumb :deep(.el-breadcrumb__item:first-child .el-breadcrumb__inner) {
+  font-weight: bold;
 }
 
 .user-dropdown {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+}
+
+.user-name {
+  font-weight: 500;
 }
 
 .el-main {
@@ -153,7 +246,7 @@ const handleCommand = (command: string) => {
   display: flex;
   align-items: center;
   padding: 0 15px;
-  color: white;
+  color: #303133;
   font-size: 18px;
   font-weight: bold;
 }
@@ -165,15 +258,17 @@ const handleCommand = (command: string) => {
 }
 
 .logo-text {
-  color: white;
+  color: #303133;
   line-height: 1.3;
   font-family: "Microsoft YaHei", "微软雅黑", "SimHei", "黑体", sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .logo-text p {
   margin: 0;
   font-weight: 600;
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+  text-shadow: none;
 }
 
 .logo-text p:first-child {
@@ -182,5 +277,31 @@ const handleCommand = (command: string) => {
 
 .logo-text p:last-child {
   font-size: 13px;
+}
+
+.logo-fade-enter-active,
+.logo-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition-delay: 0.1s;
+}
+
+.logo-fade-enter-from,
+.logo-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.menu-title {
+  display: inline-block;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition-delay: 0.1s;
+}
+
+.el-menu--collapse .menu-title {
+  opacity: 0;
+  transform: translateX(-10px);
+  transition-delay: 0s;
 }
 </style> 

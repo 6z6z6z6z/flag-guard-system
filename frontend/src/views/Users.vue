@@ -1,7 +1,7 @@
 <template>
   <div class="users-container">
-    <div class="header">
-      <h2>用户管理</h2>
+    <div class="header-controls">
+      <h1 class="page-title">用户管理</h1>
       <div class="header-actions">
         <el-input
           v-model="searchQuery"
@@ -15,6 +15,7 @@
         </el-button> -->
       </div>
     </div>
+    <el-divider />
 
     <el-table :data="users" style="width: 100%" v-loading="loading">
       <el-table-column prop="username" label="用户名" />
@@ -24,8 +25,8 @@
       <el-table-column prop="phone_number" label="手机号" />
       <el-table-column prop="role" label="角色">
         <template #default="{ row }">
-          <el-tag :type="row.role === 'admin' ? 'danger' : 'info'">
-            {{ row.role === 'admin' ? '管理员' : '队员' }}
+          <el-tag :type="getRoleTagType(row.role)">
+            {{ getRoleText(row.role) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -36,11 +37,21 @@
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
-          <el-button-group>
-            <el-button type="primary" size="small" @click="handleEdit(row)">
+          <el-button-group v-if="isSuperAdmin || isAdmin">
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="handleEdit(row)"
+              v-if="isSuperAdmin || isAdmin"
+            >
               编辑
             </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">
+            <el-button 
+              type="danger" 
+              size="small" 
+              @click="handleDelete(row)"
+              v-if="isSuperAdmin"
+            >
               删除
             </el-button>
           </el-button-group>
@@ -86,8 +97,13 @@
         <el-form-item label="手机号" prop="phone_number">
           <el-input v-model="form.phone_number" />
         </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="form.role" style="width: 100%">
+        <el-form-item label="角色" prop="role" v-if="isSuperAdmin">
+          <el-select 
+            v-model="form.role" 
+            style="width: 100%" 
+            placeholder="选择角色"
+            :disabled="form.id === userStore.userInfo?.id"
+          >
             <el-option label="管理员" value="admin" />
             <el-option label="队员" value="member" />
           </el-select>
@@ -104,10 +120,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
 import type { FormInstance } from 'element-plus'
+import { useUserStore } from '@/stores/user'
+
+const getRoleText = (role: string) => {
+  switch (role) {
+    case 'superadmin':
+      return '超级管理员'
+    case 'admin':
+      return '管理员'
+    case 'member':
+      return '队员'
+    default:
+      return '未知'
+  }
+}
+
+const getRoleTagType = (role: string) => {
+  switch (role) {
+    case 'superadmin':
+      return 'danger'
+    case 'admin':
+      return 'warning'
+    case 'member':
+      return 'info'
+    default:
+      return ''
+  }
+}
+
+const userStore = useUserStore()
+const isSuperAdmin = computed(() => userStore.userInfo?.role === 'superadmin')
+const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
 
 interface User {
   user_id: number
@@ -246,14 +293,20 @@ const handleSubmit = async () => {
   try {
     await formRef.value.validate()
     
-    // 如果角色发生变化，使用专门的接口更新角色
-    if (form.value.role !== users.value.find(u => u.user_id === form.value.id)?.role) {
+    // 只有 superadmin 可以修改角色
+    if (isSuperAdmin.value && form.value.role !== users.value.find(u => u.user_id === form.value.id)?.role) {
       await request.put(`/users/${form.value.id}/role`, { role: form.value.role })
     }
 
     // 更新其他信息
     const { username, name, student_id, college, phone_number, password } = form.value
-    const payload = { username, name, student_id, college, phone_number, password }
+    const payload: any = { username, name, student_id, college, phone_number, password }
+    
+    // 如果不是 superadmin，则不应发送角色信息
+    if (!isSuperAdmin.value) {
+      delete payload.role
+    }
+
     const response = await request.put(`/users/${form.value.id}`, payload)
 
     if (response.code === 200) {
@@ -280,15 +333,20 @@ onMounted(() => {
   padding: 20px;
 }
 
-.header {
+.header-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
 
+.page-title {
+  font-size: 24px;
+  margin: 0;
+}
+
 .search-input {
-  width: 300px;
+  width: 250px;
 }
 
 .pagination {
