@@ -6,16 +6,15 @@ from datetime import datetime
 from sqlalchemy import desc
 from utils.route_utils import (
     APIResponse, validate_required_fields, handle_exceptions,
-    validate_json_request, log_operation, role_required
+    validate_json_request, role_required
 )
 
-flag_bp = Blueprint('flag', __name__)
+bp = Blueprint('flag', __name__)
 
-@flag_bp.route('/records', methods=['POST'])
+@bp.route('/records', methods=['POST'])
 @jwt_required()
 @validate_json_request
 @handle_exceptions
-@log_operation('create_flag_record')
 def create_flag_record():
     """
     创建升降旗记录
@@ -81,10 +80,9 @@ def create_flag_record():
         current_app.logger.error(f"Failed to create flag record: {str(e)}")
         return APIResponse.error("Failed to create record", 500)
 
-@flag_bp.route('/records', methods=['GET'])
+@bp.route('/records', methods=['GET'])
 @jwt_required()
 @handle_exceptions
-@log_operation('get_flag_records')
 def get_flag_records():
     """
     获取用户的升降旗记录
@@ -128,11 +126,10 @@ def get_flag_records():
         "current_page": page
     })
 
-@flag_bp.route('/records/review', methods=['GET'])
+@bp.route('/records/review', methods=['GET'])
 @jwt_required()
 @role_required('admin')
 @handle_exceptions
-@log_operation('get_flag_records_for_review')
 def get_flag_records_for_review():
     """
     获取所有升降旗记录（管理员用）
@@ -199,11 +196,10 @@ def get_flag_records_for_review():
         "current_page": page
     })
 
-@flag_bp.route('/records/<int:record_id>/approve', methods=['POST'])
+@bp.route('/records/<int:record_id>/approve', methods=['POST'])
 @jwt_required()
 @role_required('admin')
 @handle_exceptions
-@log_operation('approve_flag_record')
 def approve_flag_record(record_id):
     """
     审核通过升降旗记录
@@ -272,11 +268,10 @@ def approve_flag_record(record_id):
         current_app.logger.error(f"Error during flag approval for record {record_id}: {str(e)}")
         return APIResponse.error("审核操作失败", 500)
 
-@flag_bp.route('/records/<int:record_id>/reject', methods=['POST'])
+@bp.route('/records/<int:record_id>/reject', methods=['POST'])
 @jwt_required()
 @role_required('admin')
 @handle_exceptions
-@log_operation('reject_flag_record')
 def reject_flag_record(record_id):
     """
     审核拒绝升降旗记录

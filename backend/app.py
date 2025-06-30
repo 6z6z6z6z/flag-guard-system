@@ -14,7 +14,7 @@ from extensions import db, jwt, migrate, init_extensions
 from flasgger import Swagger
 from models import User, OperationLog
 from flask_cors import CORS
-from cli import init_db, drop_db, create_admin, list_users, cleanup_records, backup_db, check_system, reset_password, export_data, init_cli
+from cli import init_db, drop_db, create_user, delete_user, list_users, cleanup_records, backup_db, check_system, reset_password, export_data, init_cli
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
@@ -39,11 +39,19 @@ cors = CORS()
 
 def setup_logging(app):
     """配置日志"""
+    # 使用 instance_path 确保路径的唯一性
+    log_dir = os.path.join(app.instance_path, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    
+    log_file = os.path.join(log_dir, 'app.log')
+    
+    # 移除所有现有的处理器，避免重复添加
+    for handler in app.logger.handlers[:]:
+        app.logger.removeHandler(handler)
+        
     if not app.debug and not app.testing:
-        if not os.path.exists('logs'):
-            os.mkdir('logs')
         file_handler = RotatingFileHandler(
-            'logs/app.log',
+            log_file,
             maxBytes=app.config['LOG_MAX_BYTES'],
             backupCount=app.config['LOG_BACKUP_COUNT']
         )
@@ -155,39 +163,13 @@ def setup_middleware(app):
             app.logger.info(f'Response: {response.status} in {duration:.2f}s')
         return response
 
-def create_admin_user(app):
-    """创建默认管理员用户"""
-    with app.app_context():
-        if not User.query.filter_by(username='admin').first():
-            admin_user = User(
-                username='admin',
-                role='admin',
-                name='管理员',
-                student_id='AD00000000',
-                college='学院',
-                height=170,
-                weight=60,
-                shoe_size=42,
-                total_points=0.0,
-                phone_number='00000000000'
-            )
-            admin_user.set_password('admin123')
-            db.session.add(admin_user)
-            db.session.commit()
-            app.logger.info('Default admin user created.')
-        else:
-            app.logger.info('Default admin user already exists.')
-
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     app.config['JSON_AS_ASCII'] = False
     
     # 配置日志
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    setup_logging(app)
     
     # 初始化扩展
     init_extensions(app)

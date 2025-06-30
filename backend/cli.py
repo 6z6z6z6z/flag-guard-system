@@ -33,25 +33,33 @@ def init_db():
         click.echo(f'初始化数据库失败: {str(e)}')
 
 @app.cli.command('drop-db')
+@click.option('--yes', is_flag=True, help='Skip confirmation.')
 @with_appcontext
-def drop_db():
+def drop_db(yes):
     """删除所有数据库表"""
-    if click.confirm('确定要删除所有数据库表吗？此操作不可恢复！'):
+    if yes or click.confirm('确定要删除所有数据库表吗？此操作不可恢复！'):
         try:
+            # 针对MySQL，临时禁用外键检查
+            db.session.execute(text('SET FOREIGN_KEY_CHECKS=0;'))
+            db.session.commit()
             db.drop_all()
+            db.session.execute(text('SET FOREIGN_KEY_CHECKS=1;'))
+            db.session.commit()
             click.echo('数据库表已删除')
         except Exception as e:
+            db.session.rollback()
             click.echo(f'删除数据库表失败: {str(e)}')
 
-@app.cli.command('create-admin')
+@app.cli.command('create-user')
 @click.argument('username')
 @click.argument('password')
 @click.argument('name')
 @click.argument('student_id')
 @click.option('--college', default='系统管理', help='所属学院')
+@click.option('--role', type=click.Choice(['member', 'admin', 'superadmin']), default='member', help='用户角色')
 @with_appcontext
-def create_admin(username, password, name, student_id, college):
-    """创建管理员用户"""
+def create_user(username, password, name, student_id, college, role):
+    """创建用户"""
     try:
         if User.query.filter_by(username=username).first():
             click.echo(f'用户名 {username} 已存在')
@@ -60,31 +68,31 @@ def create_admin(username, password, name, student_id, college):
             click.echo(f'学号 {student_id} 已存在')
             return
             
-        admin = User(
+        user = User(
             username=username,
             name=name,
             student_id=student_id,
-            role='admin',
+            role=role,
             college=college
         )
         
         # 设置密码并验证
-        if not admin.set_password(password):
+        if not user.set_password(password):
             click.echo('设置密码失败')
             return
             
         # 验证密码是否正确设置
-        if not admin.check_password(password):
+        if not user.check_password(password):
             click.echo('密码验证失败')
             return
             
-        db.session.add(admin)
+        db.session.add(user)
         db.session.commit()
         
         # 验证用户是否成功创建
         created_user = User.query.filter_by(username=username).first()
         if created_user and created_user.check_password(password):
-            click.echo(f'管理员用户 {username} 创建成功')
+            click.echo(f'用户 {username} 创建成功')
             click.echo(f'用户ID: {created_user.user_id}')
             click.echo(f'角色: {created_user.role}')
         else:
@@ -92,7 +100,24 @@ def create_admin(username, password, name, student_id, college):
             
     except Exception as e:
         db.session.rollback()
-        click.echo(f'创建管理员用户失败: {str(e)}')
+        click.echo(f'创建用户失败: {str(e)}')
+
+@app.cli.command('delete-user')
+@click.argument('username')
+@with_appcontext
+def delete_user(username):
+    """删除用户"""
+    try:
+        user = User.query.filter_by(username=username).first()
+        if user:
+            db.session.delete(user)
+            db.session.commit()
+            click.echo(f'用户 {username} 已删除')
+        else:
+            click.echo(f'用户 {username} 不存在')
+    except Exception as e:
+        db.session.rollback()
+        click.echo(f'删除用户失败: {str(e)}')
 
 @app.cli.command('list-users')
 @click.option('--role', help='按角色筛选')
@@ -248,21 +273,22 @@ def export_data(export_path, format):
         
         if format == 'json':
             with open(export_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            click.echo(f'数据已导出到 {export_path} (JSON格式)')
         else:
             # TODO: 实现 CSV 导出
             click.echo('CSV 导出功能尚未实现')
             return
             
-        click.echo(f'数据已导出到 {export_path}')
     except Exception as e:
         click.echo(f'导出数据失败: {str(e)}')
 
 def init_cli(app):
-    """注册所有CLI命令"""
+    """注册CLI命令"""
     app.cli.add_command(init_db)
     app.cli.add_command(drop_db)
-    app.cli.add_command(create_admin)
+    app.cli.add_command(create_user)
+    app.cli.add_command(delete_user)
     app.cli.add_command(list_users)
     app.cli.add_command(cleanup_records)
     app.cli.add_command(backup_db)

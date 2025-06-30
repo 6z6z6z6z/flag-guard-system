@@ -105,7 +105,7 @@
             v-model="form.time"
             type="datetime"
             placeholder="选择活动时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm"
             style="width: 100%"
           />
         </el-form-item>

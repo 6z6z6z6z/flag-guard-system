@@ -134,32 +134,6 @@ def role_required(*roles):
         return wrapper
     return decorator
 
-def log_operation(operation_type):
-    """操作日志装饰器"""
-    def decorator(f):
-        @wraps(f)
-        def wrapper(*args, **kwargs):
-            try:
-                result = f(*args, **kwargs)
-                if hasattr(request, 'user') and request.user:
-                    from models import OperationLog
-                    from extensions import db
-                    log = OperationLog(
-                        user_id=request.user.user_id,
-                        endpoint=request.endpoint,
-                        method=request.method,
-                        ip_address=request.remote_addr,
-                        operation_type=operation_type
-                    )
-                    db.session.add(log)
-                    db.session.commit()
-                return result
-            except Exception as e:
-                logger.error(f"Operation logging error: {str(e)}")
-                return f(*args, **kwargs)
-        return wrapper
-    return decorator
-
 def handle_exceptions(f):
     """异常处理装饰器"""
     @wraps(f)

@@ -4,10 +4,10 @@
       <h1 class="page-title">升降旗记录</h1>
       <div class="actions">
         <el-radio-group v-model="filterStatus" @change="fetchRecords" class="filter-buttons">
-          <el-radio-button label="">全部</el-radio-button>
-          <el-radio-button label="pending">待审核</el-radio-button>
-          <el-radio-button label="approved">已通过</el-radio-button>
-          <el-radio-button label="rejected">已拒绝</el-radio-button>
+          <el-radio-button value="">全部</el-radio-button>
+          <el-radio-button value="pending">待审核</el-radio-button>
+          <el-radio-button value="approved">已通过</el-radio-button>
+          <el-radio-button value="rejected">已拒绝</el-radio-button>
         </el-radio-group>
         <el-button type="primary" :icon="Plus" @click="showSubmitDialog">
           上传记录

@@ -66,7 +66,7 @@ class User(BaseModel):
             return False
             
         try:
-            self.password = generate_password_hash(password, method='pbkdf2:sha256')
+            self.password = generate_password_hash(password)
             logger.info(f'Password set for user {self.username}')
             return True
         except Exception as e:
@@ -180,6 +180,23 @@ class TrainingRegistration(BaseModel):
     # 关系
     user = db.relationship('User', back_populates='training_registrations')
     training = db.relationship('Training', back_populates='registrations')
+
+    def to_dict(self):
+        """将报名记录转换为字典，包含用户信息和标准UTC时间"""
+        return {
+            'registration_id': self.registration_id,
+            'training_id': self.training_id,
+            'user_id': self.user_id,
+            'status': self.status,
+            'attendance_status': self.attendance_status,
+            'points_awarded': self.points_awarded,
+            'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None,
+            'user': {
+                'name': self.user.name,
+                'student_id': self.user.student_id,
+                'college': self.user.college
+            }
+        }
 
 class Event(BaseModel):
     __tablename__ = 'events'

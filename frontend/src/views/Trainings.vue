@@ -136,9 +136,8 @@
       @close="currentTraining = null"
     >
       <el-table :data="currentRegistrations" style="width: 100%" v-loading="registrationsLoading">
-        <el-table-column prop="student_id" label="学号" />
-        <el-table-column prop="name" label="姓名" />
-        <el-table-column prop="college" label="学院" />
+        <el-table-column prop="user.student_id" label="学号" />
+        <el-table-column prop="user.name" label="姓名" />
         <el-table-column prop="created_at" label="报名时间">
           <template #default="{ row }">
             {{ formatRegistrationTime(row.created_at) }}
@@ -201,14 +200,16 @@ interface Training {
 }
 
 interface Registration {
-    user_id: number;
-    student_id: string;
+  registration_id: number;
+  user_id: number;
+  created_at: string;
+  attendance_status: 'present' | 'absent' | 'late' | 'early_leave' | null;
+  points_awarded: number | null;
+  status: string;
+  user: {
     name: string;
-    college: string;
-    created_at: string;
-    attendance_status: 'present' | 'absent' | 'late' | 'early_leave' | null;
-    points_awarded: number | null;
-    status: string;
+    student_id: string;
+  };
 }
 
 const api = axios.create({
@@ -405,43 +406,60 @@ const handleCancelRegister = async (training: Training) => {
 const registrationsDialogVisible = ref(false);
 const currentRegistrations = ref<Registration[]>([]);
 const registrationsLoading = ref(false);
-const currentTrainingId = ref<number | null>(null);
 const currentTraining = ref<Training | null>(null);
 const isSubmitting = ref(false);
-const isAttendanceConfirmed = ref(false);
 
 const isAttendanceDisabled = computed(() => {
-  if (!currentTraining.value) return true;
-  if (isAttendanceConfirmed.value) return true;
-  return new Date(currentTraining.value.start_time) > new Date();
+  // 如果没有当前训练，禁用
+  if (!currentTraining.value) {
+    return true;
+  }
+  // 如果训练尚未开始，禁用
+  if (new Date(currentTraining.value.start_time) > new Date()) {
+    return true;
+  }
+  // 如果已经有任何一个报名记录被授予了积分，禁用
+  return currentRegistrations.value.some(r => r.status === 'awarded');
 });
 
 const handleViewRegistrations = async (training: Training) => {
   currentTraining.value = training;
-  currentTrainingId.value = training.training_id;
-  registrationsLoading.value = true;
   registrationsDialogVisible.value = true;
-  
+  registrationsLoading.value = true;
   try {
     const response = await api.get(`/trainings/${training.training_id}/registrations`);
-    if (response.data && response.data.data) {
-      const regs = response.data.data as Registration[];
-      currentRegistrations.value = regs;
-      isAttendanceConfirmed.value = regs.some(r => r.attendance_status);
+    if (response.data.code === 200) {
+      currentRegistrations.value = response.data.data as Registration[];
     } else {
-      currentRegistrations.value = [];
-      isAttendanceConfirmed.value = false;
+      ElMessage.error(response.data.msg || '获取报名名单失败');
     }
   } catch (error) {
-    console.error('Failed to fetch registrations:', error);
-    ElMessage.error('获取报名列表失败');
+    ElMessage.error('获取报名名单失败');
+    console.error(error);
   } finally {
     registrationsLoading.value = false;
   }
 };
 
+const formatRegistrationTime = (isoString: string | null) => {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) {
+    return '日期无效';
+  }
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+};
+
 const submitAttendance = async () => {
-  if (!currentTraining.value?.training_id) return;
+  if (!currentTraining.value) return;
   isSubmitting.value = true;
 
   const payload = {
@@ -488,12 +506,6 @@ const formatDateTimeRange = (start: string, end: string) => {
   });
 
   return `${startDateTime} - ${endTime}`;
-};
-
-const formatRegistrationTime = (timeStr: string) => {
-  if (!timeStr) return '';
-  const date = new Date(timeStr);
-  return date.toLocaleString('zh-CN', { hour12: false });
 };
 
 onMounted(() => {

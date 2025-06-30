@@ -3,7 +3,7 @@ from datetime import datetime
 from models import Training, TrainingRegistration, User, PointHistory, db, EventTraining
 from utils.route_utils import (
     APIResponse, validate_required_fields, handle_exceptions,
-    validate_json_request, log_operation, role_required
+    validate_json_request, role_required
 )
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import or_
@@ -14,7 +14,6 @@ bp = Blueprint('trainings', __name__)
 @jwt_required()
 @role_required('admin')
 @handle_exceptions
-@log_operation('get_trainings_for_review')
 def get_trainings_for_review():
     """获取训练列表（管理员）"""
     page = request.args.get('page', 1, type=int)
@@ -58,7 +57,6 @@ def get_trainings_for_review():
 @jwt_required()
 @role_required('admin')
 @handle_exceptions
-@log_operation('get_attendance_list')
 def get_attendance_list(training_id):
     """获取训练考勤名单"""
     training = Training.query.get_or_404(training_id)
@@ -82,7 +80,6 @@ def get_attendance_list(training_id):
 @role_required('admin')
 @validate_json_request
 @handle_exceptions
-@log_operation('submit_attendance')
 def submit_attendance(training_id):
     """提交训练考勤"""
     training = Training.query.get_or_404(training_id)
@@ -164,7 +161,6 @@ def submit_attendance(training_id):
 @bp.route('/options')
 @jwt_required()
 @handle_exceptions
-@log_operation('get_training_options')
 def get_training_options():
     """获取训练选项列表"""
     trainings = Training.query.filter(
@@ -180,7 +176,6 @@ def get_training_options():
 @bp.route('/<int:training_id>/register', methods=['POST'])
 @jwt_required()
 @handle_exceptions
-@log_operation('register_training')
 def register_training(training_id):
     """报名训练"""
     training = Training.query.get_or_404(training_id)
@@ -210,7 +205,6 @@ def register_training(training_id):
 @bp.route('/<int:training_id>/register', methods=['DELETE'])
 @jwt_required()
 @handle_exceptions
-@log_operation('cancel_registration')
 def cancel_registration(training_id):
     """取消报名"""
     current_app.logger.info(f'开始取消报名训练 {training_id}')
@@ -247,12 +241,12 @@ def cancel_registration(training_id):
 @bp.route('/<int:training_id>/registration')
 @jwt_required()
 @handle_exceptions
-@log_operation('get_registration_status')
 def get_registration_status(training_id):
-    """获取报名状态"""
+    """获取个人对某个训练的报名状态"""
+    user_id = get_jwt_identity()
     registration = TrainingRegistration.query.filter_by(
         training_id=training_id,
-        user_id=get_jwt_identity()
+        user_id=user_id
     ).first()
     return APIResponse.success(data={
         'registered': registration is not None,
@@ -262,7 +256,6 @@ def get_registration_status(training_id):
 @bp.route('/', methods=['GET'], strict_slashes=False)
 @jwt_required()
 @handle_exceptions
-@log_operation('get_trainings')
 def get_trainings():
     """获取训练列表"""
     page = request.args.get('page', 1, type=int)
@@ -308,7 +301,6 @@ def get_trainings():
 @role_required('admin')
 @validate_json_request
 @handle_exceptions
-@log_operation('create_training')
 def create_training():
     """创建训练"""
     try:
@@ -442,27 +434,13 @@ def delete_training(training_id):
 @jwt_required()
 @role_required('admin')
 @handle_exceptions
-@log_operation('get_training_registrations')
 def get_training_registrations(training_id):
-    """获取训练报名人员名单"""
+    """获取训练报名名单"""
     training = Training.query.get_or_404(training_id)
-    registrations = TrainingRegistration.query.filter_by(training_id=training_id).all()
-    registration_list = []
-    for reg in registrations:
-        user = reg.user
-        registration_list.append({
-            'registration_id': reg.registration_id,
-            'user_id': user.user_id,
-            'username': user.username,
-            'name': user.name,
-            'student_id': user.student_id,
-            'college': user.college,
-            'status': reg.status,
-            'attendance_status': reg.attendance_status,
-            'points_awarded': reg.points_awarded,
-            'created_at': reg.created_at.isoformat() if reg.created_at else None
-        })
-    return APIResponse.success(data=registration_list)
+    registrations = TrainingRegistration.query.filter_by(training_id=training.training_id)\
+        .order_by(TrainingRegistration.created_at.asc()).all()
+
+    return APIResponse.success(data=[reg.to_dict() for reg in registrations])
 
 @bp.route('/debug', methods=['GET'])
 @jwt_required()
@@ -488,9 +466,8 @@ def debug_trainings():
 @role_required('admin')
 @validate_json_request
 @handle_exceptions
-@log_operation('confirm_attendance')
 def confirm_attendance(training_id):
-    """确认考勤并添加积分"""
+    """(管理员)批量确认/取消报名人员的出席状态"""
     training = Training.query.get_or_404(training_id)
     data = request.get_json()
     updates = data.get('updates', [])
@@ -583,7 +560,6 @@ def award_points_for_training(training_id):
 @jwt_required()
 @role_required('admin')
 @handle_exceptions
-@log_operation('get_training_registrations')
 def get_training_registrations_new(training_id):
     """获取训练报名人员名单"""
     training = Training.query.get_or_404(training_id)

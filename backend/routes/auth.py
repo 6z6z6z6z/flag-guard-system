@@ -4,8 +4,7 @@ from models import User
 from extensions import db
 from utils.route_utils import (
     APIResponse, validate_required_fields, validate_student_id,
-    validate_phone_number, handle_exceptions, validate_json_request,
-    log_operation
+    validate_phone_number, handle_exceptions, validate_json_request
 )
 
 auth_bp = Blueprint('auth', __name__)
@@ -13,7 +12,6 @@ auth_bp = Blueprint('auth', __name__)
 @auth_bp.route('/register', methods=['POST'])
 @validate_json_request
 @handle_exceptions
-@log_operation('user_registration')
 def register():
     """
     用户注册
@@ -110,7 +108,6 @@ def register():
 @auth_bp.route('/login', methods=['POST'])
 @validate_json_request
 @handle_exceptions
-@log_operation('user_login')
 def login():
     """
     用户登录
@@ -177,39 +174,6 @@ def login():
     except Exception as e:
         current_app.logger.error(f"Token creation error for user {username}: {str(e)}")
         return APIResponse.error("Error creating access token", 500)
-
-@auth_bp.route('/profile', methods=['GET'])
-@jwt_required()
-@handle_exceptions
-@log_operation('get_profile')
-def get_profile():
-    """
-    获取用户个人信息
-    ---
-    tags:
-      - 认证
-    security:
-      - Bearer: []
-    responses:
-      200:
-        description: 成功获取个人信息
-      401:
-        description: 未认证
-    """
-    user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-    if not user:
-        return APIResponse.error("User not found", 404)
-    
-    profile_data = {
-        'username': user.username,
-        'name': user.name,
-        'role': user.role,
-        'college': user.college,
-        'total_points': user.total_points,
-        'phone_number': user.phone_number
-    }
-    return APIResponse.success(data=profile_data)
 
 @auth_bp.route('/info', methods=['GET'])
 @jwt_required()

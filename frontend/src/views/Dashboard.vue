@@ -207,4 +207,11 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
 }
+.clickable {
+  cursor: pointer;
+}
+.clickable:hover {
+  transform: translateY(-5px);
+  transition: transform 0.3s ease;
+}
 </style> 

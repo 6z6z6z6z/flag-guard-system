@@ -24,6 +24,8 @@
             v-model="form.time"
             type="datetime"
             placeholder="选择活动时间"
+            format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DD HH:mm"
             :disabled-date="disabledDate"
           />
         </el-form-item>
@@ -154,6 +156,8 @@
             v-model="editForm.time"
             type="datetime"
             placeholder="选择活动时间"
+            format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DD HH:mm"
             :disabled-date="disabledDate"
           />
         </el-form-item>

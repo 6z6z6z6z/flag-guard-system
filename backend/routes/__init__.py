@@ -4,8 +4,7 @@ from routes.users import users_bp
 from routes.trainings import bp as trainings_bp
 from routes.events import bp as events_bp
 from routes.points import bp as points_bp
-from routes.flag import flag_bp
-from routes.records import records_bp
+from routes.flag import bp as flag_bp
 from routes.dashboard import dashboard_bp
 from routes.file import file_bp
 
@@ -17,7 +16,6 @@ def register_blueprints(app: Flask):
     app.register_blueprint(events_bp, url_prefix='/api/events')
     app.register_blueprint(points_bp, url_prefix='/api/points')
     app.register_blueprint(flag_bp, url_prefix='/api/flag')
-    app.register_blueprint(records_bp, url_prefix='/api/records')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
     app.register_blueprint(file_bp, url_prefix='/api/files')
     

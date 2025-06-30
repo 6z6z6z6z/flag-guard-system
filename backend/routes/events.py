@@ -5,7 +5,7 @@ from models import Event, Training, EventRegistration, PointHistory
 from extensions import db
 from utils.route_utils import (
     APIResponse, validate_required_fields, handle_exceptions,
-    validate_json_request, log_operation, role_required
+    validate_json_request, role_required
 )
 
 bp = Blueprint('events', __name__)
@@ -13,7 +13,6 @@ bp = Blueprint('events', __name__)
 @bp.route('/')
 @jwt_required()
 @handle_exceptions
-@log_operation('get_events')
 def get_events():
     """
     获取活动列表
@@ -72,7 +71,6 @@ def get_events():
 @role_required('admin')
 @validate_json_request
 @handle_exceptions
-@log_operation('create_event')
 def create_event():
     """
     创建活动
@@ -149,7 +147,6 @@ def create_event():
 @role_required('admin')
 @validate_json_request
 @handle_exceptions
-@log_operation('update_event')
 def update_event(event_id):
     """
     更新活动
@@ -230,7 +227,6 @@ def update_event(event_id):
 @jwt_required()
 @role_required('admin')
 @handle_exceptions
-@log_operation('delete_event')
 def delete_event(event_id):
     """
     删除活动
@@ -273,7 +269,6 @@ def delete_event(event_id):
 @bp.route('/<int:event_id>/register', methods=['POST'])
 @jwt_required()
 @handle_exceptions
-@log_operation('register_for_event')
 def register_for_event(event_id):
     """
     报名参加活动
@@ -331,7 +326,6 @@ def register_for_event(event_id):
 @bp.route('/<int:event_id>/register', methods=['DELETE'])
 @jwt_required()
 @handle_exceptions
-@log_operation('cancel_event_registration')
 def cancel_event_registration(event_id):
     """
     取消活动报名
@@ -374,7 +368,6 @@ def cancel_event_registration(event_id):
 @jwt_required()
 @role_required('admin')
 @handle_exceptions
-@log_operation('get_event_registrations')
 def get_event_registrations(event_id):
     """
     获取活动报名人员名单
@@ -424,8 +417,9 @@ def get_event_registrations(event_id):
 
 @bp.route('/<int:event_id>/points', methods=['POST'])
 @jwt_required()
+@role_required('admin')
+@validate_json_request
 @handle_exceptions
-@log_operation('add_event_points')
 def add_event_points(event_id):
     """
     添加活动积分

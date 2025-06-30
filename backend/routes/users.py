@@ -6,7 +6,7 @@ from sqlalchemy import or_, func
 from utils.route_utils import (
     APIResponse, validate_required_fields, validate_student_id,
     validate_phone_number, handle_exceptions, validate_json_request,
-    log_operation, role_required
+    role_required
 )
 
 users_bp = Blueprint('users', __name__)
@@ -14,8 +14,7 @@ users_bp = Blueprint('users', __name__)
 @users_bp.route('/profile', methods=['GET'])
 @jwt_required()
 @handle_exceptions
-@log_operation('get_profile')
-def get_profile():
+def get_user_profile():
     """
     获取用户个人信息
     ---
@@ -56,8 +55,7 @@ def get_profile():
 @jwt_required()
 @validate_json_request
 @handle_exceptions
-@log_operation('update_profile')
-def update_profile():
+def update_user_profile():
     """
     更新用户个人信息
     ---
@@ -110,8 +108,7 @@ def update_profile():
 @users_bp.route('/points/history', methods=['GET'])
 @jwt_required()
 @handle_exceptions
-@log_operation('get_points_history')
-def get_points_history():
+def get_user_points_history():
     """
     获取用户积分历史
     ---
@@ -158,7 +155,6 @@ def get_points_history():
 @users_bp.route('/search', methods=['GET'])
 @jwt_required()
 @handle_exceptions
-@log_operation('search_users')
 def search_users():
     """
     搜索用户
@@ -198,7 +194,6 @@ def search_users():
 @jwt_required()
 @role_required('superadmin', 'admin')
 @handle_exceptions
-@log_operation('get_all_users_points')
 def get_all_users_points():
     """
     获取所有用户的积分（仅管理员）
@@ -255,7 +250,6 @@ def get_all_users_points():
 @role_required('superadmin')
 @validate_json_request
 @handle_exceptions
-@log_operation('create_user')
 def create_user():
     """
     创建新用户（仅管理员）
@@ -356,7 +350,6 @@ def create_user():
 @role_required('superadmin')
 @validate_json_request
 @handle_exceptions
-@log_operation('update_user_role')
 def update_user_role(user_id):
     """
     更新用户角色（仅管理员）
@@ -423,7 +416,6 @@ def update_user_role(user_id):
 @role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
-@log_operation('update_user')
 def update_user(user_id):
     """
     更新用户信息（仅管理员）

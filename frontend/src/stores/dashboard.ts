@@ -20,7 +20,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     total_events: 0,
     total_flags: 0,
     pending_records: 0,
-    total_points: 0
+    total_points: 0,
   })
   const recentEvents = ref<any[]>([])
   const recentTrainings = ref<any[]>([])
@@ -40,7 +40,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
           total_events: data.total_events || 0,
           total_flags: data.total_flags || 0,
           pending_records: data.pending_records || 0,
-          total_points: data.total_points || 0
+          total_points: data.total_points || 0,
         }
         recentEvents.value = data.recent_events || []
         recentTrainings.value = data.recent_trainings || []
@@ -60,6 +60,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     recentTrainings,
     pendingTasks,
     loading,
-    fetchDashboardData
+    fetchDashboardData,
   }
 }) 

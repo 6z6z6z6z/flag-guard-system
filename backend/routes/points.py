@@ -4,16 +4,15 @@ from sqlalchemy import func, and_
 from models import User, PointHistory, db
 from utils.route_utils import (
     APIResponse, validate_required_fields, handle_exceptions,
-    validate_json_request, log_operation, role_required
+    validate_json_request, role_required
 )
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 bp = Blueprint('points', __name__)
 
-@bp.route('/history')
+@bp.route('/history', methods=['GET'])
 @jwt_required()
 @handle_exceptions
-@log_operation('get_point_history')
 def get_point_history():
     """
     获取个人积分历史
@@ -95,11 +94,10 @@ def get_point_history():
         current_app.logger.error(f"Error in get_point_history: {str(e)}", exc_info=True)
         raise
 
-@bp.route('/history/all')
+@bp.route('/history/all', methods=['GET'])
 @jwt_required()
 @role_required('admin', 'superadmin')
 @handle_exceptions
-@log_operation('get_all_point_history')
 def get_all_point_history():
     """
     获取所有用户的积分历史（管理员）
@@ -173,10 +171,10 @@ def get_all_point_history():
         current_app.logger.error(f"Error in get_all_point_history: {str(e)}", exc_info=True)
         raise
 
-@bp.route('/statistics')
+@bp.route('/statistics', methods=['GET'])
 @jwt_required()
+@role_required('admin', 'superadmin')
 @handle_exceptions
-@log_operation('get_point_statistics')
 def get_point_statistics():
     """
     获取积分统计信息
@@ -248,10 +246,9 @@ def get_point_statistics():
 
 @bp.route('/adjust', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
-@log_operation('adjust_points')
 def adjust_points():
     """
     调整用户积分（管理员）
