@@ -1,42 +1,42 @@
-# Team-Sys: Ð£Ñ§Éú¹úÆì»¤ÎÀ¶Ó¹ÜÀíÏµÍ³
+# Flag-Guard-System: æ ¡å­¦ç”Ÿå›½æ——æŠ¤å«é˜Ÿç®¡ç†ç³»ç»Ÿ
 
-`Team-Sys` ÊÇÒ»¸ö¹¦ÄÜÍê±¸µÄÈ«Õ»WebÓ¦ÓÃ£¬Ö¼ÔÚÎªÐ£Ñ§Éú¹úÆì»¤ÎÀ¶ÓÌá¹©Ò»¸ö¸ßÐ§¡¢Ö±¹ÛµÄ»î¶¯Óë³ÉÔ±¹ÜÀí½â¾ö·½°¸¡£ÏµÍ³ÄÚÖÃÁËÓÃ»§¹ÜÀí¡¢ÑµÁ·ÈÕ³Ì¡¢»î¶¯×éÖ¯¡¢»ý·Ö¼¤ÀøµÈºËÐÄÄ£¿é£¬²ÉÓÃÏÖ´ú»¯µÄ¼¼ÊõÕ»¹¹½¨£¬Ç°¶Ë»ùÓÚ Vue.js£¬ºó¶ËÔòÓÉ Flask Çý¶¯¡£
+`Flag-Guard-System` æ˜¯ä¸€ä¸ªåŠŸèƒ½å®Œå¤‡çš„å…¨æ ˆWebåº”ç”¨ï¼Œæ—¨åœ¨ä¸ºæ ¡å­¦ç”Ÿå›½æ——æŠ¤å«é˜Ÿæä¾›ä¸€ä¸ªé«˜æ•ˆã€ç›´è§‚çš„æ´»åŠ¨ä¸Žæˆå‘˜ç®¡ç†è§£å†³æ–¹æ¡ˆã€‚ç³»ç»Ÿå†…ç½®äº†ç”¨æˆ·ç®¡ç†ã€è®­ç»ƒæ—¥ç¨‹ã€æ´»åŠ¨ç»„ç»‡ã€ç§¯åˆ†æ¿€åŠ±ç­‰æ ¸å¿ƒæ¨¡å—ï¼Œé‡‡ç”¨çŽ°ä»£åŒ–çš„æŠ€æœ¯æ ˆæž„å»ºï¼Œå‰ç«¯åŸºäºŽ Vue.jsï¼ŒåŽç«¯åˆ™ç”± Flask é©±åŠ¨ã€‚
 
-## ? ºËÐÄ¹¦ÄÜ
+## ? æ ¸å¿ƒåŠŸèƒ½
 
-- **? ÓÃ»§¹ÜÀí**: »ùÓÚ½ÇÉ«µÄÈ¨ÏÞ¿ØÖÆ£¨³ÉÔ±¡¢¹ÜÀíÔ±¡¢³¬¼¶¹ÜÀíÔ±£©£¬Ö§³ÖÓÃ»§ÐÅÏ¢µÄÔöÉ¾¸Ä²é¡£
-- **?? ÑµÁ·¹ÜÀí**: ÇáËÉ´´½¨¡¢±à¼­ºÍ¹ÜÀíÑµÁ·ÈÕ³Ì£¬×·×Ù³ÉÔ±µÄ±¨ÃûÓë¿¼ÇÚÇé¿ö¡£
-- **? »î¶¯¹ÜÀí**: ±ã½ÝµØ×éÖ¯ÍÅ¶Ó»î¶¯£¬²¢¿É½«»î¶¯ÓëÌØ¶¨µÄÑµÁ·ÏîÄ¿½øÐÐ¹ØÁª¡£
-- **? »ý·ÖÏµÍ³**: Îª²ÎÓëÑµÁ·¡¢Éý½µÆìµÈ»î¶¯µÄÓÃ»§ÊÚÓè»ý·Ö£¬½¨Á¢¼¤Àø»úÖÆ¡£
-- **? ¹ÜÀíÒÇ±íÅÌ**: Îª¹ÜÀíÔ±Ìá¹©ÏµÍ³Êý¾Ý¸ÅÀÀ£¬°üÀ¨´ý°ìÊÂÏî¡¢½üÆÚ»î¶¯µÈ£¬ÊµÏÖÒ»Õ¾Ê½¹ÜÀí¡£
-- **? RESTful API**: Ìá¹©¶¨ÒåÇåÎúµÄ API ½Ó¿Ú£¬È·±£Ç°ºó¶ËÊý¾ÝÍ¨ÐÅµÄÎÈ¶¨Óë¸ßÐ§¡£
+- **? ç”¨æˆ·ç®¡ç†**: åŸºäºŽè§’è‰²çš„æƒé™æŽ§åˆ¶ï¼ˆæˆå‘˜ã€ç®¡ç†å‘˜ã€è¶…çº§ç®¡ç†å‘˜ï¼‰ï¼Œæ”¯æŒç”¨æˆ·ä¿¡æ¯çš„å¢žåˆ æ”¹æŸ¥ã€‚
+- **?? è®­ç»ƒç®¡ç†**: è½»æ¾åˆ›å»ºã€ç¼–è¾‘å’Œç®¡ç†è®­ç»ƒæ—¥ç¨‹ï¼Œè¿½è¸ªæˆå‘˜çš„æŠ¥åä¸Žè€ƒå‹¤æƒ…å†µã€‚
+- **? æ´»åŠ¨ç®¡ç†**: ä¾¿æ·åœ°ç»„ç»‡å›¢é˜Ÿæ´»åŠ¨ï¼Œå¹¶å¯å°†æ´»åŠ¨ä¸Žç‰¹å®šçš„è®­ç»ƒé¡¹ç›®è¿›è¡Œå…³è”ã€‚
+- **? ç§¯åˆ†ç³»ç»Ÿ**: ä¸ºå‚ä¸Žè®­ç»ƒã€å‡é™æ——ç­‰æ´»åŠ¨çš„ç”¨æˆ·æŽˆäºˆç§¯åˆ†ï¼Œå»ºç«‹æ¿€åŠ±æœºåˆ¶ã€‚
+- **? ç®¡ç†ä»ªè¡¨ç›˜**: ä¸ºç®¡ç†å‘˜æä¾›ç³»ç»Ÿæ•°æ®æ¦‚è§ˆï¼ŒåŒ…æ‹¬å¾…åŠžäº‹é¡¹ã€è¿‘æœŸæ´»åŠ¨ç­‰ï¼Œå®žçŽ°ä¸€ç«™å¼ç®¡ç†ã€‚
+- **? RESTful API**: æä¾›å®šä¹‰æ¸…æ™°çš„ API æŽ¥å£ï¼Œç¡®ä¿å‰åŽç«¯æ•°æ®é€šä¿¡çš„ç¨³å®šä¸Žé«˜æ•ˆã€‚
 
-## ?? ¼¼ÊõÕ»
+## ?? æŠ€æœ¯æ ˆ
 
-|              | ¼¼Êõ                                                                  |
+|              | æŠ€æœ¯                                                                  |
 | ------------ | --------------------------------------------------------------------- |
-| **ºó¶Ë**     | Python 3, Flask, SQLAlchemy, Flask-Migrate, Flask-JWT-Extended        |
-| **Ç°¶Ë**     | Vue 3 (Composition API), TypeScript, Element Plus, Pinia, Vue Router, Axios |
-| **Êý¾Ý¿â**   | MySQL                                                                 |
-| **¿ª·¢¹¤¾ß** | Node.js, npm, pip, virtualenv                                         |
+| **åŽç«¯**     | Python 3, Flask, SQLAlchemy, Flask-Migrate, Flask-JWT-Extended        |
+| **å‰ç«¯**     | Vue 3 (Composition API), TypeScript, Element Plus, Pinia, Vue Router, Axios |
+| **æ•°æ®åº“**   | MySQL                                                                 |
+| **å¼€å‘å·¥å…·** | Node.js, npm, pip, virtualenv                                         |
 
-## ? ±¾µØ²¿ÊðÖ¸ÄÏ
+## ? æœ¬åœ°éƒ¨ç½²æŒ‡å—
 
-Çë×ñÑ­ÒÔÏÂ²½ÖèÔÚÄúµÄ±¾µØ»·¾³ÖÐÔËÐÐ´ËÏîÄ¿¡£
+è¯·éµå¾ªä»¥ä¸‹æ­¥éª¤åœ¨æ‚¨çš„æœ¬åœ°çŽ¯å¢ƒä¸­è¿è¡Œæ­¤é¡¹ç›®ã€‚
 
-### ×¼±¸¹¤×÷
+### å‡†å¤‡å·¥ä½œ
 
-- È·±£ÄúµÄµçÄÔÒÑ°²×° [Node.js](https://nodejs.org/) (v16+ °æ±¾)
-- È·±£ÄúµÄµçÄÔÒÑ°²×° [Python](https://www.python.org/) (v3.8+ °æ±¾)
-- È·±£ÄúµÄµçÄÔÒÑ°²×°²¢ÔËÐÐ [MySQL](https://www.mysql.com/) ·þÎñ
+- ç¡®ä¿æ‚¨çš„ç”µè„‘å·²å®‰è£… [Node.js](https://nodejs.org/) (v16+ ç‰ˆæœ¬)
+- ç¡®ä¿æ‚¨çš„ç”µè„‘å·²å®‰è£… [Python](https://www.python.org/) (v3.8+ ç‰ˆæœ¬)
+- ç¡®ä¿æ‚¨çš„ç”µè„‘å·²å®‰è£…å¹¶è¿è¡Œ [MySQL](https://www.mysql.com/) æœåŠ¡
 
-### ºó¶Ë·þÎñÆô¶¯
+### åŽç«¯æœåŠ¡å¯åŠ¨
 
 ```bash
-# 1. ½øÈëºó¶ËÏîÄ¿Ä¿Â¼
+# 1. è¿›å…¥åŽç«¯é¡¹ç›®ç›®å½•
 cd backend
 
-# 2. ´´½¨²¢¼¤»î Python ÐéÄâ»·¾³
+# 2. åˆ›å»ºå¹¶æ¿€æ´» Python è™šæ‹ŸçŽ¯å¢ƒ
 # Windows
 python -m venv venv
 venv\Scripts\activate
@@ -45,59 +45,59 @@ venv\Scripts\activate
 # python3 -m venv venv
 # source venv/bin/activate
 
-# 3. °²×°ËùÓÐÒÀÀµ
+# 3. å®‰è£…æ‰€æœ‰ä¾èµ–
 pip install -r requirements.txt
 
-# 4. ÅäÖÃÊý¾Ý¿âÁ¬½Ó
-#    - Ê×ÏÈ£¬ÔÚÄúµÄ MySQL ÖÐ´´½¨Ò»¸öÐÂµÄÊý¾Ý¿â (ÀýÈç `teamsys_db`)¡£
-#    - È»ºó£¬´ò¿ª `backend/config.py` ÎÄ¼þ£¬ÐÞ¸Ä `SQLALCHEMY_DATABASE_URI` µÄÖµÎªÄúµÄÊý¾Ý¿âÁ¬½ÓÐÅÏ¢¡£
-#      Ê¾Àý: 'mysql+pymysql://ÄãµÄÓÃ»§Ãû:ÄãµÄÃÜÂë@127.0.0.1/teamsys_db'
+# 4. é…ç½®æ•°æ®åº“è¿žæŽ¥
+#    - é¦–å…ˆï¼Œåœ¨æ‚¨çš„ MySQL ä¸­åˆ›å»ºä¸€ä¸ªæ–°çš„æ•°æ®åº“ (ä¾‹å¦‚ `teamsys_db`)ã€‚
+#    - ç„¶åŽï¼Œæ‰“å¼€ `backend/config.py` æ–‡ä»¶ï¼Œä¿®æ”¹ `SQLALCHEMY_DATABASE_URI` çš„å€¼ä¸ºæ‚¨çš„æ•°æ®åº“è¿žæŽ¥ä¿¡æ¯ã€‚
+#      ç¤ºä¾‹: 'mysql+pymysql://ä½ çš„ç”¨æˆ·å:ä½ çš„å¯†ç @127.0.0.1/teamsys_db'
 
-# 5. ³õÊ¼»¯Êý¾Ý¿â²¢´´½¨³¬¼¶¹ÜÀíÔ±ÕËºÅ
-#    Çë½« <...> ²¿·ÖÌæ»»ÎªÄúÏëÒªµÄÐÅÏ¢
+# 5. åˆå§‹åŒ–æ•°æ®åº“å¹¶åˆ›å»ºè¶…çº§ç®¡ç†å‘˜è´¦å·
+#    è¯·å°† <...> éƒ¨åˆ†æ›¿æ¢ä¸ºæ‚¨æƒ³è¦çš„ä¿¡æ¯
 flask --app backend/app.py drop-db --yes
 flask --app backend/app.py init-db
-flask --app backend/app.py create-user <ÓÃ»§Ãû> <ÃÜÂë> <ÐÕÃû> <Ñ§ºÅ(Èç:PB23000000)> --role superadmin
+flask --app backend/app.py create-user <ç”¨æˆ·å> <å¯†ç > <å§“å> <å­¦å·(å¦‚:PB23000000)> --role superadmin
 
-# 6. Æô¶¯ºó¶Ë¿ª·¢·þÎñÆ÷
+# 6. å¯åŠ¨åŽç«¯å¼€å‘æœåŠ¡å™¨
 flask run
 ```
 
-### Ç°¶Ë·þÎñÆô¶¯
+### å‰ç«¯æœåŠ¡å¯åŠ¨
 
 ```bash
-# 1. ´ò¿ªÒ»¸öÐÂµÄÖÕ¶Ë£¬½øÈëÇ°¶ËÏîÄ¿Ä¿Â¼
+# 1. æ‰“å¼€ä¸€ä¸ªæ–°çš„ç»ˆç«¯ï¼Œè¿›å…¥å‰ç«¯é¡¹ç›®ç›®å½•
 cd frontend
 
-# 2. °²×°ËùÓÐÒÀÀµ
+# 2. å®‰è£…æ‰€æœ‰ä¾èµ–
 npm install
 
-# 3. Æô¶¯Ç°¶Ë¿ª·¢·þÎñÆ÷
+# 3. å¯åŠ¨å‰ç«¯å¼€å‘æœåŠ¡å™¨
 npm run serve
 ```
 
-µ±ËùÓÐ²½ÖèÍê³Éºó£¬Äú¿ÉÒÔÍ¨¹ýä¯ÀÀÆ÷·ÃÎÊ `http://localhost:8080` À´²é¿´ÔËÐÐÖÐµÄÏîÄ¿¡£
+å½“æ‰€æœ‰æ­¥éª¤å®ŒæˆåŽï¼Œæ‚¨å¯ä»¥é€šè¿‡æµè§ˆå™¨è®¿é—® `http://localhost:8080` æ¥æŸ¥çœ‹è¿è¡Œä¸­çš„é¡¹ç›®ã€‚
 
-## ? ÏîÄ¿½á¹¹
+## ? é¡¹ç›®ç»“æž„
 
 ```
 system/
-©À©¤©¤ backend/            # Flask ºó¶ËÔ´´úÂë
-©¦   ©À©¤©¤ app.py          # Ó¦ÓÃÖ÷ÎÄ¼þ
-©¦   ©À©¤©¤ cli.py          # ×Ô¶¨Òå Flask ÃüÁî
-©¦   ©À©¤©¤ config.py       # ÅäÖÃÎÄ¼þ
-©¦   ©À©¤©¤ models.py       # Êý¾Ý¿âÄ£ÐÍ
-©¦   ©¸©¤©¤ routes/         # API Â·ÓÉÀ¶Í¼
-©À©¤©¤ frontend/           # Vue.js Ç°¶ËÔ´´úÂë
-©¦   ©À©¤©¤ src/
-©¦   ©¦   ©À©¤©¤ components/ # ¿É¸´ÓÃ×é¼þ
-©¦   ©¦   ©À©¤©¤ stores/     # Pinia ×´Ì¬¹ÜÀí
-©¦   ©¦   ©À©¤©¤ views/      # Ò³ÃæÊÓÍ¼
-©¦   ©¦   ©¸©¤©¤ ...
-©¦   ©¸©¤©¤ package.json
-©¸©¤©¤ README.md           # ±¾ÎÄµµ
+â”œâ”€â”€ backend/            # Flask åŽç«¯æºä»£ç 
+â”‚   â”œâ”€â”€ app.py          # åº”ç”¨ä¸»æ–‡ä»¶
+â”‚   â”œâ”€â”€ cli.py          # è‡ªå®šä¹‰ Flask å‘½ä»¤
+â”‚   â”œâ”€â”€ config.py       # é…ç½®æ–‡ä»¶
+â”‚   â”œâ”€â”€ models.py       # æ•°æ®åº“æ¨¡åž‹
+â”‚   â””â”€â”€ routes/         # API è·¯ç”±è“å›¾
+â”œâ”€â”€ frontend/           # Vue.js å‰ç«¯æºä»£ç 
+â”‚   â”œâ”€â”€ src/
+â”‚   â”‚   â”œâ”€â”€ components/ # å¯å¤ç”¨ç»„ä»¶
+â”‚   â”‚   â”œâ”€â”€ stores/     # Pinia çŠ¶æ€ç®¡ç†
+â”‚   â”‚   â”œâ”€â”€ views/      # é¡µé¢è§†å›¾
+â”‚   â”‚   â””â”€â”€ ...
+â”‚   â””â”€â”€ package.json
+â””â”€â”€ README.md           # æœ¬æ–‡æ¡£
 ```
 
-## Ðí¿ÉÖ¤
+## è®¸å¯è¯
 
 MIT 
