@@ -55,12 +55,12 @@ pip install -r requirements.txt
 
 # 5. 初始化数据库并创建超级管理员账号
 #    请将 <...> 部分替换为您想要的信息
-flask --app backend/app.py drop-db --yes
-flask --app backend/app.py init-db
-flask --app backend/app.py create-user <用户名> <密码> <姓名> <学号(如:PB23000000)> --role superadmin
+flask --app app.py drop-db --yes
+flask --app app.py init-db
+flask --app app.py create-user <用户名> <密码> <姓名> <学号(如:PB23000000)> --role superadmin
 
 # 6. 启动后端开发服务器
-flask run
+python app.py
 ```
 
 ### 前端服务启动
