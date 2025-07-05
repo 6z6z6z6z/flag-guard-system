@@ -471,7 +471,7 @@ class Event(BaseModel):
         if isinstance(event_time, str):
             event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
             
-        return '未开始' if event_time > datetime.now() else '已结束'
+        return '未开始' if event_time > datetime.now() else '已开始'
     
     @classmethod
     def to_dict(cls, event):

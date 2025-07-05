@@ -13,8 +13,8 @@
             <template #header>
               <div class="card-header">
                 <span class="event-name">{{ event.name }}</span>
-                <el-tag :type="isEventExpired(event.time) ? 'info' : 'success'" size="small">
-                  {{ isEventExpired(event.time) ? '已结束' : '进行中' }}
+                <el-tag :type="getEventDisplayStatus(event.time) === '未开始' ? 'success' : 'info'" size="small">
+                  {{ getEventDisplayStatus(event.time) }}
                 </el-tag>
               </div>
             </template>
@@ -27,7 +27,7 @@
               <div class="actions">
                 <!-- 报名/取消报名按钮 -->
                 <el-button
-                  v-if="!event.is_registered && !isEventExpired(event.time)"
+                  v-if="getEventDisplayStatus(event.time) === '未开始' && !event.is_registered"
                   type="success"
                   size="small"
                   @click="registerEvent(event)"
@@ -36,7 +36,7 @@
                   报名参加
                 </el-button>
                 <el-button
-                  v-else-if="event.is_registered && !isEventExpired(event.time)"
+                  v-else-if="getEventDisplayStatus(event.time) === '未开始' && event.is_registered"
                   type="danger"
                   size="small"
                   @click="cancelRegistration(event)"
@@ -45,7 +45,7 @@
                   取消报名
                 </el-button>
                  <el-button
-                  v-else-if="isEventExpired(event.time)"
+                  v-else-if="getEventDisplayStatus(event.time) === '已结束'"
                   type="info"
                   size="small"
                   disabled
@@ -56,7 +56,7 @@
 
                 <!-- 管理员操作 -->
                 <div class="admin-actions" v-if="userStore.userInfo?.role === 'admin' || userStore.userInfo?.role === 'superadmin'">
-                   <el-button type="primary" link @click="showEditDialog(event)">编辑</el-button>
+                   <el-button type="primary" link @click="showEditDialog(event)" :disabled="getEventDisplayStatus(event.time) === '已结束'">编辑</el-button>
                    <el-button type="danger" link @click="handleDelete(event)">删除</el-button>
                    <el-button type="info" link @click="showRegistrations(event)">查看报名</el-button>
                 </div>
@@ -232,9 +232,9 @@ const rules = {
   location: [{ required: true, message: '请输入活动地点', trigger: 'blur' }]
 }
 
-// 检查活动是否已过期
-const isEventExpired = (time: string): boolean => {
-  return new Date(time) < new Date()
+// 检查活动是否已过期，并返回状态字符串
+const getEventDisplayStatus = (time: string): string => {
+  return new Date(time) < new Date() ? '已结束' : '未开始'
 }
 
 // 格式化时间显示
