@@ -26,7 +26,7 @@ export const useUserStore = defineStore('user', () => {
   
   // 计算属性：判断是否为管理员
   const isAdmin = computed(() => {
-    return userInfo.value?.role === 'admin'
+    return userInfo.value?.role === 'admin' || userInfo.value?.role === 'superadmin'
   })
 
   // 获取token - 直接从 localStorage 获取，这是最可靠的同步方式

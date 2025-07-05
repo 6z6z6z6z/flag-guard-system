@@ -187,7 +187,7 @@ def get_flag_records():
 
 @bp.route('/records/review', methods=['GET'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'captain', 'superadmin')
 @handle_exceptions
 def get_flag_records_for_review():
     """
@@ -318,7 +318,7 @@ def get_flag_records_for_review():
 
 @bp.route('/records/<int:record_id>/approve', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin', 'captain')
 @handle_exceptions
 def approve_flag_record(record_id):
     """
@@ -398,7 +398,7 @@ def approve_flag_record(record_id):
 
 @bp.route('/records/<int:record_id>/reject', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin', 'captain')
 @handle_exceptions
 def reject_flag_record(record_id):
     """

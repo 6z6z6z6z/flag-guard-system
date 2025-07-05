@@ -84,7 +84,7 @@ def get_events():
 
 @bp.route('/', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
 def create_event():
@@ -157,7 +157,7 @@ def create_event():
 
 @bp.route('/<int:event_id>', methods=['PUT'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
 def update_event(event_id):
@@ -248,7 +248,7 @@ def update_event(event_id):
 
 @bp.route('/<int:event_id>', methods=['DELETE'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def delete_event(event_id):
     """
@@ -404,7 +404,7 @@ def cancel_event_registration(event_id):
 
 @bp.route('/<int:event_id>/registrations', methods=['GET'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def get_event_registrations(event_id):
     """
@@ -501,7 +501,7 @@ def get_event_registrations(event_id):
 
 @bp.route('/<int:event_id>/points', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
 def add_event_points(event_id):

@@ -107,7 +107,7 @@ const handleLogin = async () => {
 
       // 根据用户角色跳转到不同页面
       if (userInfo) {
-        if (userInfo.role === 'admin' || userInfo.role === 'captain') {
+        if (userInfo.role === 'admin' || userInfo.role === 'captain' || userInfo.role === 'superadmin') {
           router.replace('/dashboard')
         } else {
           router.replace('/profile')

@@ -188,7 +188,7 @@ import { ref, onMounted, computed, reactive } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
-import axios from 'axios';
+import request from '../utils/request';
 import { Plus, Calendar, Location, Star } from '@element-plus/icons-vue';
 
 interface Training {
@@ -214,21 +214,11 @@ interface Registration {
   };
 }
 
-const api = axios.create({
-  baseURL: process.env.VUE_APP_API_BASE_URL || 'http://127.0.0.1:5000/api',
-});
-
-api.interceptors.request.use(config => {
-  const userStore = useUserStore();
-  const token = userStore.getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
 const userStore = useUserStore();
-const isAdmin = computed(() => userStore.userInfo?.role === 'admin');
+const isAdmin = computed(() => {
+  const role = userStore.userInfo?.role;
+  return role === 'admin' || role === 'superadmin';
+});
 
 const trainings = ref<Training[]>([]);
 const loading = ref(true);
@@ -287,15 +277,19 @@ const resetForm = () => {
 const fetchTrainings = async () => {
   loading.value = true;
   try {
-    const response = await api.get('/trainings/', {
+    const response = await request.get('/trainings/', {
       params: {
         page: currentPage.value,
         per_page: pageSize.value,
       },
     });
-    if (response.data && response.data.data && response.data.data.items) {
-      trainings.value = response.data.data.items;
-      total.value = response.data.data.total;
+    if (response && response.data && response.data.items) {
+      trainings.value = response.data.items;
+      total.value = response.data.total;
+    } else if (response && response.data) {
+      // Alternative format - data is directly in response.data
+      trainings.value = response.data;
+      total.value = trainings.value.length;
     } else {
       trainings.value = [];
       total.value = 0;
@@ -355,10 +349,14 @@ const handleSubmit = async () => {
       };
 
       const url = isEdit.value ? `/trainings/${payload.training_id}` : '/trainings/';
-      const method = isEdit.value ? 'put' : 'post';
       try {
-        await api[method](url, payload);
-        ElMessage.success(isEdit.value ? '更新成功' : '创建成功');
+        if (isEdit.value) {
+          await request.put(url, payload);
+          ElMessage.success('更新成功');
+        } else {
+          await request.post(url, payload);
+          ElMessage.success('创建成功');
+        }
         dialogVisible.value = false;
         fetchTrainings();
       } catch (error) {
@@ -376,7 +374,7 @@ const handleDelete = async (trainingId: number) => {
     type: 'warning',
   });
   try {
-    await api.delete(`/trainings/${trainingId}`);
+    await request.delete(`/trainings/${trainingId}`);
     ElMessage.success('删除成功');
     fetchTrainings();
   } catch (error) {
@@ -387,21 +385,21 @@ const handleDelete = async (trainingId: number) => {
 
 const handleRegister = async (training: Training) => {
   try {
-    await api.post(`/trainings/${training.training_id}/register`);
+    await request.post(`/trainings/${training.training_id}/register`);
     ElMessage.success('报名成功');
     fetchTrainings();
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '报名失败');
+    ElMessage.error(error.response?.data?.msg || '报名失败');
   }
 };
 
 const handleCancelRegister = async (training: Training) => {
   try {
-    await api.delete(`/trainings/${training.training_id}/register`);
+    await request.delete(`/trainings/${training.training_id}/register`);
     ElMessage.success('取消报名成功');
     fetchTrainings();
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '取消报名失败');
+    ElMessage.error(error.response?.data?.msg || '取消报名失败');
   }
 };
 
@@ -429,20 +427,20 @@ const handleViewRegistrations = async (training: Training) => {
   registrationsDialogVisible.value = true;
   registrationsLoading.value = true;
   try {
-    const response = await api.get(`/trainings/${training.training_id}/registrations`);
-    console.log('训练报名数据响应:', response.data); // 添加调试日志
+    const response = await request.get(`/trainings/${training.training_id}/registrations`);
+    console.log('训练报名数据响应:', response); // 添加调试日志
     
-    if (response.data.code === 200) {
-      if (Array.isArray(response.data.data)) {
-        currentRegistrations.value = response.data.data as Registration[];
-      } else if (response.data.data && response.data.data.items) {
-        currentRegistrations.value = response.data.data.items as Registration[];
+    if (response.code === 200) {
+      if (Array.isArray(response.data)) {
+        currentRegistrations.value = response.data as Registration[];
+      } else if (response.data && response.data.items) {
+        currentRegistrations.value = response.data.items as Registration[];
       } else {
         currentRegistrations.value = [];
         console.warn('无效的报名数据格式:', response.data);
       }
     } else {
-      ElMessage.error(response.data.msg || '获取报名名单失败');
+      ElMessage.error(response.msg || '获取报名名单失败');
     }
   } catch (error) {
     ElMessage.error('获取报名名单失败');
@@ -481,7 +479,7 @@ const submitAttendance = async () => {
   };
 
   try {
-    await api.post(`/trainings/${currentTraining.value.training_id}/attendance`, payload);
+    await request.post(`/trainings/${currentTraining.value.training_id}/attendance`, payload);
     ElMessage.success('考勤状态更新成功');
     registrationsDialogVisible.value = false;
   } catch (error) {

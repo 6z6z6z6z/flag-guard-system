@@ -1,8 +1,8 @@
 <template>
   <div class="events-container">
-    <div class="header-controls">
+          <div class="header-controls">
       <h1 class="page-title">活动列表</h1>
-      <el-button v-if="userStore.userInfo?.role === 'admin'" type="primary" @click="showCreateDialog" :icon="Plus">创建活动</el-button>
+      <el-button v-if="userStore.userInfo?.role === 'admin' || userStore.userInfo?.role === 'superadmin'" type="primary" @click="showCreateDialog" :icon="Plus">创建活动</el-button>
     </div>
     <el-divider />
 
@@ -55,7 +55,7 @@
                 </el-button>
 
                 <!-- 管理员操作 -->
-                <div class="admin-actions" v-if="userStore.userInfo?.role === 'admin'">
+                <div class="admin-actions" v-if="userStore.userInfo?.role === 'admin' || userStore.userInfo?.role === 'superadmin'">
                    <el-button type="primary" link @click="showEditDialog(event)">编辑</el-button>
                    <el-button type="danger" link @click="handleDelete(event)">删除</el-button>
                    <el-button type="info" link @click="showRegistrations(event)">查看报名</el-button>
@@ -331,7 +331,7 @@ const cancelRegistration = async (event: Event) => {
 }
 
 const showCreateDialog = () => {
-  if (userStore.userInfo?.role !== 'admin') {
+  if (userStore.userInfo?.role !== 'admin' && userStore.userInfo?.role !== 'superadmin') {
     ElMessage.error('只有管理员可以创建活动')
     return
   }
@@ -348,7 +348,7 @@ const showCreateDialog = () => {
 }
 
 const showEditDialog = (row: Event) => {
-  if (userStore.userInfo?.role !== 'admin') {
+  if (userStore.userInfo?.role !== 'admin' && userStore.userInfo?.role !== 'superadmin') {
     ElMessage.error('只有管理员可以编辑活动')
     return
   }
@@ -386,7 +386,7 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     
     // 检查用户是否为管理员
-    if (userStore.userInfo?.role !== 'admin') {
+    if (userStore.userInfo?.role !== 'admin' && userStore.userInfo?.role !== 'superadmin') {
       ElMessage.error('只有管理员可以创建活动')
       return
     }
@@ -426,7 +426,7 @@ const handleSubmit = async () => {
 }
 
 const handleDelete = async (row: Event) => {
-  if (userStore.userInfo?.role !== 'admin') {
+  if (userStore.userInfo?.role !== 'admin' && userStore.userInfo?.role !== 'superadmin') {
     ElMessage.error('只有管理员可以删除活动')
     return
   }

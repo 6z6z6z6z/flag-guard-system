@@ -53,7 +53,7 @@ const routes: RouteRecordRaw[] = [
         path: 'flag-review',
         name: 'FlagReview',
         component: () => import('../views/FlagReview.vue'),
-        meta: { title: '升降旗审核', icon: 'Check', roles: ['admin', 'captain'] }
+        meta: { title: '升降旗审核', icon: 'Check', roles: ['admin', 'captain', 'superadmin'] }
       },
       {
         path: 'trainings',
@@ -65,7 +65,7 @@ const routes: RouteRecordRaw[] = [
         path: 'training-review',
         name: 'TrainingReview',
         component: () => import('../views/TrainingReview.vue'),
-        meta: { title: '训练审核', icon: 'Document', roles: ['admin', 'captain'] }
+        meta: { title: '训练审核', icon: 'Document', roles: ['admin', 'captain', 'superadmin'] }
       },
       {
         path: 'events',
@@ -77,7 +77,7 @@ const routes: RouteRecordRaw[] = [
         path: 'event-manage',
         name: 'EventManage',
         component: () => import('../views/EventManage.vue'),
-        meta: { title: '活动创建', icon: 'Plus', roles: ['captain'] }
+        meta: { title: '活动创建', icon: 'Plus', roles: ['captain', 'admin', 'superadmin'] }
       },
       {
         path: 'points',
@@ -89,13 +89,13 @@ const routes: RouteRecordRaw[] = [
         path: 'points-manage',
         name: 'PointsManage',
         component: () => import('../views/PointsManage.vue'),
-        meta: { title: '积分管理', icon: 'Operation', roles: ['admin'] }
+        meta: { title: '积分管理', icon: 'Operation', roles: ['admin', 'superadmin'] }
       },
       {
         path: 'users',
         name: 'Users',
         component: () => import('../views/Users.vue'),
-        meta: { title: '用户管理', icon: 'User', roles: ['admin', 'captain'] }
+        meta: { title: '用户管理', icon: 'User', roles: ['admin', 'captain', 'superadmin'] }
       },
       {
         path: 'training-attendance/:id',
@@ -105,15 +105,16 @@ const routes: RouteRecordRaw[] = [
           requiresAuth: true
         }
       },
-      {
-        path: 'training-review/:id',
-        name: 'TrainingReview',
-        component: () => import('@/views/TrainingReview.vue'),
-        meta: {
-          requiresAuth: true,
-          requiresAdmin: true
+              {
+          path: 'training-review/:id',
+          name: 'TrainingReview',
+          component: () => import('@/views/TrainingReview.vue'),
+          meta: {
+            requiresAuth: true,
+            requiresAdmin: true,
+            roles: ['admin', 'captain', 'superadmin']
+          }
         }
-      }
     ]
   },
   {
@@ -130,45 +131,56 @@ const router = createRouter({
 
 // 全局前置守卫
 router.beforeEach(async (to, from, next) => {
-  // !! 关键改动：在守卫函数内部获取 store 实例
   const userStore = useUserStore()
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
 
   if (requiresAuth) {
     const token = userStore.getToken()
     if (token) {
-      // 如果有 token，但没有用户信息，说明是刷新页面或刚登录
-      if (!userStore.userInfo) {
+      // Pinia store state is often automatically unwrapped in router guards
+      // So, userStore.userInfo directly refers to UserInfo | null
+      if (userStore.userInfo === null) { // Direct check for null
         try {
-          // 获取用户信息，这是进入系统的第一步
-          await userStore.getUserInfo()
-          next()
+          await userStore.getUserInfo() // This updates userStore.userInfo
+          // After getUserInfo, userStore.userInfo will be updated.
+          // No need for a local variable as userStore.userInfo is reactive.
         } catch (error) {
           console.error('Authentication error during navigation:', error)
-          userStore.logout() // 清理状态并跳转到登录页
+          userStore.logout()
           ElMessage.error('认证失败，请重新登录')
           next({ name: 'Login' })
+          return // Ensure only one next() call
         }
+      }
+
+      // userStore.userInfo is now either a UserInfo object or still null if getUserInfo failed
+      const userRole = userStore.userInfo?.role || '' // Safely access role with optional chaining
+      
+      const hasRequiredRole = to.matched.every(record => {
+        if (record.meta.roles) {
+          return (record.meta.roles as string[]).includes(userRole)
+        }
+        return true
+      })
+
+      if (!hasRequiredRole) {
+        ElMessage.error('您没有权限访问该页面')
+        next({ path: '/dashboard' })
       } else {
-        // 用户信息已存在，直接放行
         next()
       }
     } else {
-      // 没有 token，跳转到登录页
       ElMessage.warning('请先登录')
       next({ name: 'Login' })
     }
   } else {
-    // 如果目标路由不需要认证
     if (to.name === 'Login' && userStore.getToken()) {
-      // 如果已登录，访问登录页则重定向到首页
       next({ path: '/' })
     } else {
       next()
     }
   }
 
-  // 设置页面标题
   document.title = `${to.meta.title || '学生管理系统'}`
 })
 

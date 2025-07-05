@@ -12,7 +12,7 @@ bp = Blueprint('trainings', __name__)
 
 @bp.route('/review')
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def get_trainings_for_review():
     """获取训练列表（管理员）"""
@@ -80,7 +80,7 @@ def get_trainings_for_review():
 
 @bp.route('/<int:training_id>/attendance')
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def get_attendance_list(training_id):
     """获取训练考勤名单"""
@@ -112,7 +112,7 @@ def get_attendance_list(training_id):
 
 @bp.route('/<int:training_id>/attendance', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
 def submit_attendance(training_id):
@@ -367,7 +367,7 @@ def get_trainings():
 
 @bp.route('/', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
 def create_training():
@@ -409,7 +409,7 @@ def create_training():
 
 @bp.route('/<int:training_id>', methods=['PUT'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
 def update_training(training_id):
@@ -455,7 +455,7 @@ def update_training(training_id):
 
 @bp.route('/<int:training_id>', methods=['DELETE'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def delete_training(training_id):
     """删除训练"""
@@ -466,7 +466,7 @@ def delete_training(training_id):
 
 @bp.route('/<int:training_id>/registrations')
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def get_training_registrations(training_id):
     """获取训练报名列表"""
@@ -475,7 +475,7 @@ def get_training_registrations(training_id):
 
 @bp.route('/debug', methods=['GET'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def debug_trainings():
     """调试训练数据"""
@@ -507,7 +507,7 @@ def debug_trainings():
 
 @bp.route('/<int:training_id>/registrations/attendance', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @validate_json_request
 @handle_exceptions
 def confirm_attendance(training_id):
@@ -543,7 +543,7 @@ def confirm_attendance(training_id):
 
 @bp.route('/registrations/<int:registration_id>/reject', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def reject_registration(registration_id):
     """拒绝训练报名"""
@@ -564,7 +564,7 @@ def reject_registration(registration_id):
 
 @bp.route('/<int:training_id>/award', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def award_points_for_training(training_id):
     """为训练参与者发放积分"""
@@ -619,7 +619,7 @@ def award_points_for_training(training_id):
 
 @bp.route('/<int:training_id>/registrations', methods=['GET'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def get_training_registrations_new(training_id):
     """获取训练报名列表（分页版本）"""
@@ -647,7 +647,7 @@ def get_training_registrations_new(training_id):
 
 @bp.route('/registrations/<int:registration_id>/confirm', methods=['POST'])
 @jwt_required()
-@role_required('admin')
+@role_required('admin', 'superadmin')
 @handle_exceptions
 def confirm_registration(registration_id):
     """确认训练报名"""

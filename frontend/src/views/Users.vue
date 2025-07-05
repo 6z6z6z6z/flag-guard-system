@@ -154,7 +154,7 @@ const getRoleTagType = (role: string) => {
 
 const userStore = useUserStore()
 const isSuperAdmin = computed(() => userStore.userInfo?.role === 'superadmin')
-const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
+const isAdmin = computed(() => userStore.userInfo?.role === 'admin' || userStore.userInfo?.role === 'superadmin')
 
 interface User {
   user_id: number
