@@ -17,7 +17,7 @@ def register_blueprints(app: Flask):
     app.register_blueprint(points_bp, url_prefix='/api/points')
     app.register_blueprint(flag_bp, url_prefix='/api/flag')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
-    app.register_blueprint(file_bp, url_prefix='/api/files')
+    app.register_blueprint(file_bp, url_prefix='/api')
     
     # 注册错误处理
     @app.errorhandler(404)

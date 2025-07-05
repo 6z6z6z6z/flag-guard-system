@@ -37,37 +37,52 @@ def upload_file():
       500:
         description: 上传失败
     """
+    current_app.logger.info("处理文件上传请求")
+    
     if 'file' not in request.files:
+        current_app.logger.warning("上传请求中没有文件部分")
         return APIResponse.error('No file part', 400)
     
     file = request.files['file']
     if file.filename == '':
+        current_app.logger.warning("没有选择文件")
         return APIResponse.error('No selected file', 400)
         
     if not allowed_file(file.filename):
+        current_app.logger.warning(f"无效的文件类型: {file.filename}")
         return APIResponse.error('Invalid file type', 400)
     
     try:
         # 确保上传目录存在
         upload_folder = current_app.config['UPLOAD_FOLDER']
+        current_app.logger.info(f"上传目录: {upload_folder}")
         if not os.path.exists(upload_folder):
+            current_app.logger.info(f"创建上传目录: {upload_folder}")
             os.makedirs(upload_folder)
             
         # 生成随机文件名防止路径遍历
         filename = secure_filename(str(uuid.uuid4()) + os.path.splitext(file.filename)[1])
         filepath = os.path.join(upload_folder, filename)
         
+        current_app.logger.info(f"保存文件到: {filepath}")
         file.save(filepath)
         
         # 返回完整的URL路径
+        file_url = f'/api/uploads/{filename}'
+        current_app.logger.info(f"文件上传成功，URL: {file_url}")
         return APIResponse.success(data={
-            'url': f'/api/uploads/{filename}'
+            'url': file_url
         })
     except Exception as e:
-        current_app.logger.error(f"File upload error: {str(e)}")
+        current_app.logger.error(f"文件上传错误: {str(e)}", exc_info=True)
         return APIResponse.error(str(e), 500)
 
 @file_bp.route('/uploads/<filename>')
 def serve_file(filename):
     """提供上传的文件"""
-    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
+    current_app.logger.info(f"获取上传的文件: {filename}")
+    try:
+        return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
+    except Exception as e:
+        current_app.logger.error(f"获取文件错误: {str(e)}", exc_info=True)
+        return APIResponse.error(f"文件不存在: {filename}", 404)

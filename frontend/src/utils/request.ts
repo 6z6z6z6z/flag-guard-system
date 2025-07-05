@@ -20,8 +20,10 @@ instance.interceptors.request.use(
 
     // 确保 URL 不以 http 开头，这样我们就可以安全地添加 /api 前缀
     if (config.url && !config.url.startsWith('http')) {
-      // 统一添加 /api 前缀
-      config.url = config.url.startsWith('/') ? `/api${config.url}` : `/api/${config.url}`;
+      // 如果 URL 已经包含了/api，不需要重复添加
+      if (!config.url.startsWith('/api')) {
+        config.url = config.url.startsWith('/') ? `/api${config.url}` : `/api/${config.url}`;
+      }
     }
 
     const token = localStorage.getItem('token')
@@ -35,6 +37,7 @@ instance.interceptors.request.use(
       config.headers.set('Authorization', `Bearer ${token}`)
     }
     
+    console.log('Request URL:', config.url);
     return config
   },
   error => {

@@ -304,18 +304,36 @@ const getStatusText = (status: string) => {
 
 // 获取图片URL
 const getImageUrl = (url: string) => {
-  if (!url) return ''
-  if (url.startsWith('http')) return url
+  if (!url) return '';
+  
+  console.log('Processing image URL:', url);
+  
+  // 完整URL直接返回
+  if (url.startsWith('http')) return url;
+  
   // 后端返回的URL是 /api/uploads/xxx.jpg
-  // 我们需要把它变成 /uploads/xxx.jpg 以便代理
   if (url.startsWith('/api/uploads/')) {
-    return url.substring(4) // 去掉 /api
+    // 去掉 /api 前缀，变成 /uploads/xxx.jpg
+    console.log('Converting API URL:', url, '->', url.substring(4));
+    return url.substring(4);
   }
+  
+  // 已经是 /uploads/ 开头的URL
   if (url.startsWith('/uploads/')) {
-    return url
+    return url;
   }
-  // 对于历史数据，可能没有前缀
-  return `/uploads/${url.split('/').pop()}`
+  
+  // 对于历史数据，可能是相对路径或只有文件名
+  if (url.includes('/')) {
+    // 提取文件名
+    const filename = url.split('/').pop();
+    console.log('Extracted filename:', filename);
+    return `/uploads/${filename}`;
+  } else {
+    // 直接是文件名
+    console.log('Using filename directly:', url);
+    return `/uploads/${url}`;
+  }
 }
 
 onMounted(() => {

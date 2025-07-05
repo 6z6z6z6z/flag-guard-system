@@ -161,6 +161,12 @@ def create_app():
     # 配置日志
     setup_logging(app)
     
+    # 确保上传目录存在
+    upload_folder = app.config['UPLOAD_FOLDER']
+    if not os.path.exists(upload_folder):
+        app.logger.info(f"创建上传目录: {upload_folder}")
+        os.makedirs(upload_folder)
+    
     # 初始化扩展
     init_extensions(app)
     
@@ -169,6 +175,11 @@ def create_app():
     
     # 注册CLI命令
     init_cli(app)
+    
+    # 添加静态文件服务，确保上传文件可被直接访问
+    @app.route('/uploads/<path:filename>')
+    def serve_uploads(filename):
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
     
     return app
 

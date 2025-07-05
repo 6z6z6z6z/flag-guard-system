@@ -864,15 +864,23 @@ class PointHistory(BaseModel):
     def get_user_total(cls, user_id):
         """获取用户总积分"""
         try:
+            logger.info(f"获取用户 {user_id} 的总积分")
             result = db.execute_query(
                 POINT_HISTORY_QUERIES['get_user_total'], 
                 (user_id,), 
                 fetch_one=True
             )
-            return result['total_points'] if result and result['total_points'] else 0
+            
+            # 确保结果存在且不为None
+            total_points = 0.0
+            if result and result.get('total_points') is not None:
+                total_points = float(result['total_points'])
+            logger.info(f"用户 {user_id} 的总积分: {total_points}")
+            return total_points
         except Exception as e:
             logger.error(f"获取用户总积分失败: {str(e)}")
-            return 0
+            logger.exception(e)
+            return 0.0
 
 class OperationLog(BaseModel):
     """操作日志模型"""

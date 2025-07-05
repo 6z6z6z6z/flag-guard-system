@@ -52,17 +52,48 @@ def get_point_history():
         history_list = PointHistory.list_by_user(user_id)
         current_app.logger.info(f"Retrieved {len(history_list)} history records")
         
+        # 获取用户信息，确保用户存在
+        user = User.get_by_id(user_id)
+        if not user:
+            current_app.logger.warning(f"User not found for ID: {user_id}, returning empty history")
+            return APIResponse.success(data={
+                'items': [],
+                'total': 0,
+                'pages': 0,
+                'current_page': page,
+                'total_points': 0.0
+            })
+        
+        # 确保总积分为浮点数
+        total_points = float(user.get('total_points', 0.0))
+        current_app.logger.info(f"User total points: {total_points}")
+        
+        # 如果没有历史记录，返回空列表
+        if not history_list:
+            current_app.logger.info(f"No point history for user {user_id}")
+            return APIResponse.success(data={
+                'items': [],
+                'total': 0,
+                'pages': 0,
+                'current_page': page,
+                'total_points': total_points
+            })
+        
         # 按类型过滤
         if type_filter:
             history_list = [h for h in history_list if h.get('change_type') == type_filter]
             current_app.logger.info(f"Filtered by type: {len(history_list)} records match")
         
         # 按时间降序排序
-        history_list.sort(
-            key=lambda x: x.get('change_time') if isinstance(x.get('change_time'), datetime) 
-            else datetime.fromisoformat(x.get('change_time').replace('Z', '+00:00')), 
-            reverse=True
-        )
+        try:
+            history_list.sort(
+                key=lambda x: x.get('change_time') if isinstance(x.get('change_time'), datetime) 
+                else datetime.fromisoformat(x.get('change_time').replace('Z', '+00:00')), 
+                reverse=True
+            )
+        except Exception as e:
+            current_app.logger.error(f"Error sorting history: {str(e)}", exc_info=True)
+            # 如果排序失败，返回原始列表
         
         # 手动分页
         total = len(history_list)
@@ -85,16 +116,12 @@ def get_point_history():
         
         current_app.logger.info(f"Final items count: {len(items)}")
         
-        # 获取用户信息
-        user = User.get_by_id(user_id)
-        current_app.logger.info(f"User total points: {user.get('total_points') if user else 'User not found'}")
-        
         response_data = {
             'items': items,
             'total': total,
             'pages': total_pages,
             'current_page': page,
-            'total_points': float(user.get('total_points', 0)) if user else 0.0
+            'total_points': total_points
         }
         
         current_app.logger.info(f"Response data prepared")

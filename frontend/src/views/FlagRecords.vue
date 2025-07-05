@@ -202,18 +202,36 @@ const handlePreview = (url: string) => {
 
 // 获取图片URL
 const getImageUrl = (url: string) => {
-  if (!url) return ''
-  if (url.startsWith('http')) return url
+  if (!url) return '';
+  
+  console.log('Processing image URL:', url);
+  
+  // 完整URL直接返回
+  if (url.startsWith('http')) return url;
+  
   // 后端返回的URL是 /api/uploads/xxx.jpg
-  // 我们需要把它变成 /uploads/xxx.jpg 以便代理
   if (url.startsWith('/api/uploads/')) {
-    return url.substring(4) // 去掉 /api
+    // 去掉 /api 前缀，变成 /uploads/xxx.jpg
+    console.log('Converting API URL:', url, '->', url.substring(4));
+    return url.substring(4);
   }
+  
+  // 已经是 /uploads/ 开头的URL
   if (url.startsWith('/uploads/')) {
-    return url
+    return url;
   }
-  // 对于历史数据，可能没有前缀
-  return `/uploads/${url.split('/').pop()}`
+  
+  // 对于历史数据，可能是相对路径或只有文件名
+  if (url.includes('/')) {
+    // 提取文件名
+    const filename = url.split('/').pop();
+    console.log('Extracted filename:', filename);
+    return `/uploads/${filename}`;
+  } else {
+    // 直接是文件名
+    console.log('Using filename directly:', url);
+    return `/uploads/${url}`;
+  }
 }
 
 // 上传相关方法
@@ -239,7 +257,7 @@ const customUpload = async (options: any) => {
   try {
     console.log('Uploading file:', options.file.name);
     
-    const response = await request.post('/files/upload', formData, {
+    const response = await request.post('/api/files/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -247,7 +265,7 @@ const customUpload = async (options: any) => {
     
     console.log('Upload response:', response);
 
-    if (response.data && response.data.url) {
+    if (response.code === 200 && response.data && response.data.url) {
       flagForm.value.photo_url = response.data.url;
       console.log('Setting photo URL to:', response.data.url);
       ElMessage.success('上传成功');
@@ -257,7 +275,11 @@ const customUpload = async (options: any) => {
     }
   } catch (error: any) {
     console.error('File upload error:', error);
-    ElMessage.error(error.response?.data?.msg || '上传请求失败');
+    if (error.response && error.response.status === 404) {
+      ElMessage.error('上传服务不可用，请联系管理员');
+    } else {
+      ElMessage.error(error.response?.data?.msg || '上传请求失败');
+    }
   }
 }
 

@@ -63,7 +63,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import request from '../utils/request'
 import { formatDateTime } from '../utils/format'
 
@@ -106,38 +105,55 @@ const lastMonthPoints = ref(0)
 // 获取积分历史
 const fetchPointHistory = async () => {
   try {
+    console.log('Fetching point history...');
     const response = await request.get<PointHistoryResponse>('/points/history', {
       params: {
         page: currentPage.value,
         per_page: pageSize.value,
         type: filterType.value
       }
-    })
-    if (response && response.data) {
-      const { items = [], total: totalCount = 0 } = response.data
-      pointHistory.value = items
-      total.value = totalCount
+    });
+    
+    console.log('Point history response:', response);
+    
+    if (response && response.code === 200) {
+      const { items = [], total: totalCount = 0, total_points = 0 } = response.data || {};
+      pointHistory.value = items || [];
+      total.value = totalCount || 0;
+      totalPoints.value = total_points || 0;
     } else {
-      ElMessage.error('获取积分历史失败：数据格式错误')
+      console.error('Invalid point history response:', response);
+      pointHistory.value = [];
+      total.value = 0;
     }
   } catch (error) {
-    ElMessage.error('获取积分历史失败')
+    console.error('Error fetching point history:', error);
+    pointHistory.value = [];
+    total.value = 0;
   }
 }
 
 // 获取积分统计
 const fetchPointsStatistics = async () => {
   try {
-    const response = await request.get<PointStatisticsResponse>('/points/statistics')
-    if (response && response.data) {
-      totalPoints.value = response.data.total_points || 0
-      monthlyPoints.value = response.data.monthly_points || 0
-      lastMonthPoints.value = response.data.last_month_points || 0
+    console.log('Fetching point statistics...');
+    const response = await request.get<PointStatisticsResponse>('/points/statistics');
+    
+    console.log('Point statistics response:', response);
+    
+    if (response && response.code === 200 && response.data) {
+      totalPoints.value = response.data.total_points || 0;
+      monthlyPoints.value = response.data.monthly_points || 0;
+      lastMonthPoints.value = response.data.last_month_points || 0;
     } else {
-      ElMessage.error('获取积分统计失败：数据格式错误')
+      console.error('Invalid point statistics response:', response);
+      // 不显示错误提示，只是在控制台记录错误
+      // 使用从积分历史获得的总积分，或默认为0
     }
   } catch (error) {
-    ElMessage.error('获取积分统计失败')
+    console.error('Error fetching point statistics:', error);
+    // 不显示错误提示，只是在控制台记录错误
+    // 使用从积分历史获得的总积分，或默认为0
   }
 }
 
