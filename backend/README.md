@@ -1,140 +1,152 @@
-# Ğ£¹úÆì»¤ÎÀ¶Ó¹ÜÀíÏµÍ³ºó¶Ë
+# Flag Guard System Backend
 
-## ÏîÄ¿ËµÃ÷
-ÕâÊÇÒ»¸ö»ùÓÚ Flask µÄĞ£¹úÆì»¤ÎÀ¶Ó¹ÜÀíÏµÍ³ºó¶Ë£¬Ìá¹©ÓÃ»§¹ÜÀí¡¢»î¶¯¹ÜÀí¡¢ÑµÁ·¹ÜÀí¡¢Éı½µÆì¼ÇÂ¼µÈ¹¦ÄÜ¡£
+## ç³»ç»Ÿæ¦‚è¿°
 
-## ¹¦ÄÜÌØĞÔ
-- ÓÃ»§ÈÏÖ¤ÓëÊÚÈ¨
-- »î¶¯¹ÜÀí
-- ÑµÁ·¹ÜÀí
-- Éı½µÆì¼ÇÂ¼
-- »ı·ÖÏµÍ³
-- ÎÄ¼şÉÏ´«
-- API ÎÄµµ£¨Swagger£©
+Flag Guard Systemæ˜¯ä¸€ä¸ªç”¨äºç®¡ç†æ——é˜Ÿçš„ç³»ç»Ÿï¼Œæ”¯æŒä»¥ä¸‹åŠŸèƒ½ï¼š
 
-## ¼¼ÊõÕ»
-- Python 3.8+
-- Flask
-- SQLAlchemy
-- JWT
-- Swagger
+- ç”¨æˆ·ç®¡ç†
+- è®­ç»ƒç®¡ç†
+- æ´»åŠ¨ç®¡ç†
+- å‡é™æ——è®°å½•
+- ç§¯åˆ†ç®¡ç†
+- æ–‡ä»¶ä¸Šä¼ 
 
-## °²×°ËµÃ÷
+## æŠ€æœ¯æ ˆ
 
-1. ¿ËÂ¡ÏîÄ¿
-```bash
-git clone <repository-url>
-cd backend
-```
+- Python 3.9+
+- Flask æ¡†æ¶
+- PyMySQL æ•°æ®åº“è¿æ¥
+- MySQL æ•°æ®åº“
+- JWT è®¤è¯
 
-2. ´´½¨ĞéÄâ»·¾³
+## æ•°æ®åº“è¿ç§»è¯´æ˜
+
+æœ¬ç³»ç»Ÿå·²ä»SQLAlchemyè¿ç§»è‡³PyMySQLç›´æ¥è¿æ¥MySQLæ•°æ®åº“ã€‚ä¸»è¦å˜æ›´å¦‚ä¸‹ï¼š
+
+1. ä½¿ç”¨`db_connection.py`ç®¡ç†æ•°æ®åº“è¿æ¥
+2. ä½¿ç”¨`models_pymysql.py`æ›¿ä»£åŸæ¥çš„`models.py`
+3. å°†SQLè¯­å¥ç‹¬ç«‹åˆ°`sql/queries.py`ä¸­
+4. æ•°æ®åº“Schemaå®šä¹‰åœ¨`sql/schema.sql`ä¸­
+
+## é¡¹ç›®ç»“æ„
+
+- `app.py` - åº”ç”¨å…¥å£
+- `config.py` - é…ç½®æ–‡ä»¶
+- `extensions.py` - æ‰©å±•åˆå§‹åŒ–
+- `db_connection.py` - æ•°æ®åº“è¿æ¥ç®¡ç†
+- `models_pymysql.py` - æ•°æ®æ¨¡å‹
+- `sql/` - SQLç›¸å…³æ–‡ä»¶
+  - `queries.py` - SQLæŸ¥è¯¢è¯­å¥
+  - `schema.sql` - æ•°æ®åº“æ¶æ„
+- `routes/` - è·¯ç”±æ¨¡å—
+  - `auth.py` - è®¤è¯è·¯ç”±
+  - `users.py` - ç”¨æˆ·è·¯ç”±
+  - `trainings.py` - è®­ç»ƒè·¯ç”±
+  - `events.py` - æ´»åŠ¨è·¯ç”±
+  - `flag.py` - å‡é™æ——è·¯ç”±
+  - `points.py` - ç§¯åˆ†è·¯ç”±
+  - `file.py` - æ–‡ä»¶è·¯ç”±
+- `utils/` - å·¥å…·å‡½æ•°
+- `middleware/` - ä¸­é—´ä»¶
+- `uploads/` - ä¸Šä¼ æ–‡ä»¶å­˜å‚¨ç›®å½•
+- `instance/` - å®ä¾‹é…ç½®å’Œæ•°æ®
+
+## è¿è¡Œæ–¹æ³•
+
+1. åˆ›å»ºå¹¶æ¿€æ´»è™šæ‹Ÿç¯å¢ƒï¼š
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
+venv\Scripts\activate  # Windows
 ```
 
-3. °²×°ÒÀÀµ
+2. å®‰è£…ä¾èµ–ï¼š
+
 ```bash
 pip install -r requirements.txt
 ```
 
-4. ÅäÖÃ»·¾³±äÁ¿
-¸´ÖÆ `.env.example` Îª `.env` ²¢ĞŞ¸ÄÅäÖÃ£º
-```bash
-cp .env.example .env
+3. é…ç½®ç¯å¢ƒå˜é‡ï¼ˆå¯é€‰ï¼‰ï¼š
+
+åˆ›å»º`.env`æ–‡ä»¶ï¼ŒåŒ…å«ä»¥ä¸‹å†…å®¹ï¼š
+
+```
+SECRET_KEY=your-secret-key
+JWT_SECRET_KEY=your-jwt-secret
+MYSQL_HOST=localhost
+MYSQL_USER=root
+MYSQL_PASSWORD=your-password
+MYSQL_DATABASE=system
+MYSQL_PORT=3306
 ```
 
-5. ³õÊ¼»¯Êı¾İ¿â
+4. åˆå§‹åŒ–æ•°æ®åº“ï¼š
+
 ```bash
 flask init-db
 ```
 
-6. ´´½¨¹ÜÀíÔ±ÓÃ»§
+5. åˆ›å»ºç®¡ç†å‘˜ç”¨æˆ·ï¼š
+
 ```bash
-flask create-admin <username> <password> <name> <student_id>
+flask create-user -u admin -p password -r superadmin -n Admin -s ADMIN001 -c College
 ```
 
-## ÔËĞĞÏîÄ¿
+6. è¿è¡Œåº”ç”¨ï¼š
 
-1. Æô¶¯¿ª·¢·şÎñÆ÷
 ```bash
 flask run
 ```
 
-2. ·ÃÎÊ API ÎÄµµ
-```
-http://localhost:5000/apidocs
-```
+## APIæ–‡æ¡£
 
-## ÃüÁîĞĞ¹¤¾ß
+å¯åŠ¨åº”ç”¨åï¼Œè®¿é—® `/apidocs` å¯ä»¥æŸ¥çœ‹Swagger APIæ–‡æ¡£ã€‚
 
-ÏµÍ³Ìá¹©ÒÔÏÂÃüÁîĞĞ¹¤¾ß£º
+## å‘½ä»¤è¡Œå·¥å…·
 
-- `flask init-db`: ³õÊ¼»¯Êı¾İ¿â
-- `flask drop-db`: É¾³ıËùÓĞÊı¾İ¿â±í
-- `flask create-admin`: ´´½¨¹ÜÀíÔ±ÓÃ»§
-- `flask list-users`: ÁĞ³öËùÓĞÓÃ»§
-- `flask cleanup-records`: ÇåÀí¾É¼ÇÂ¼
-- `flask backup-db`: ±¸·İÊı¾İ¿â
-- `flask check-system`: ¼ì²éÏµÍ³×´Ì¬
-- `flask reset-password`: ÖØÖÃÓÃ»§ÃÜÂë
-- `flask export-data`: µ¼³öÏµÍ³Êı¾İ
+- `flask init-db` - åˆå§‹åŒ–æ•°æ®åº“
+- `flask drop-db` - åˆ é™¤æ•°æ®åº“(è°¨æ…ä½¿ç”¨)
+- `flask create-user` - åˆ›å»ºç”¨æˆ·
+- `flask delete-user` - åˆ é™¤ç”¨æˆ·
+- `flask list-users` - åˆ—å‡ºæ‰€æœ‰ç”¨æˆ·
+- `flask cleanup-records` - æ¸…ç†è¿‡æœŸè®°å½•
+- `flask backup-db` - å¤‡ä»½æ•°æ®åº“
+- `flask check-system` - æ£€æŸ¥ç³»ç»ŸçŠ¶æ€
+- `flask reset-password` - é‡ç½®ç”¨æˆ·å¯†ç 
 
-## ÏîÄ¿½á¹¹
-```
-backend/
-©À©¤©¤ app.py              # Ó¦ÓÃÈë¿Ú
-©À©¤©¤ config.py           # ÅäÖÃÎÄ¼ş
-©À©¤©¤ extensions.py       # FlaskÀ©Õ¹
-©À©¤©¤ models.py           # Êı¾İÄ£ĞÍ
-©À©¤©¤ cli.py             # ÃüÁîĞĞ¹¤¾ß
-©À©¤©¤ requirements.txt    # ÏîÄ¿ÒÀÀµ
-©À©¤©¤ .env               # »·¾³±äÁ¿
-©À©¤©¤ routes/            # Â·ÓÉÄ£¿é
-©À©¤©¤ utils/             # ¹¤¾ßº¯Êı
-©À©¤©¤ middleware/        # ÖĞ¼ä¼ş
-©À©¤©¤ uploads/           # ÉÏ´«ÎÄ¼şÄ¿Â¼
-©¸©¤©¤ logs/              # ÈÕÖ¾Ä¿Â¼
-```
+## é¡¹ç›®è¯´æ˜
 
-## ¿ª·¢Ö¸ÄÏ
+1. é¡¹ç›®ç»“æ„
+- ä½¿ç”¨ Black æ ¼å¼åŒ–ä»£ç 
+- ä½¿ç”¨ Flake8 æ£€æŸ¥ä»£ç 
 
-1. ´úÂë·ç¸ñ
-- Ê¹ÓÃ Black ½øĞĞ´úÂë¸ñÊ½»¯
-- Ê¹ÓÃ Flake8 ½øĞĞ´úÂë¼ì²é
-
-2. ²âÊÔ
+2. æµ‹è¯•
 ```bash
 pytest
 ```
 
-3. Êı¾İ¿âÇ¨ÒÆ
+3. æ•°æ®åº“è¿ç§»
 ```bash
 flask db migrate -m "migration message"
 flask db upgrade
 ```
 
-## ²¿ÊğËµÃ÷
+4. é¡¹ç›®è¯´æ˜
+- ä¿®æ”¹ `.env` æ–‡ä»¶ä¸­çš„é…ç½®
+- è®¾ç½® `FLASK_ENV=production`
+- å¤‡ä»½æ•°æ®åº“
+- ç¡®ä¿æ‰€æœ‰æ•æ„Ÿä¿¡æ¯åŠ å¯†
 
-1. Éú²ú»·¾³ÅäÖÃ
-- ĞŞ¸Ä `.env` ÎÄ¼şÖĞµÄ»·¾³±äÁ¿
-- ÉèÖÃ `FLASK_ENV=production`
-- ÅäÖÃÊı¾İ¿âÁ¬½Ó
-- ÉèÖÃ°²È«µÄÃÜÔ¿
-
-2. Ê¹ÓÃ Gunicorn ÔËĞĞ
+5. ä½¿ç”¨ Gunicorn éƒ¨ç½²
 ```bash
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
-## ¹±Ï×Ö¸ÄÏ
+6. è´¡çŒ®é¡¹ç›®
+- Fork é¡¹ç›®
+- æä¾›æ”¯æŒ
+- æäº¤ Pull Request
 
-1. Fork ÏîÄ¿
-2. ´´½¨ÌØĞÔ·ÖÖ§
-3. Ìá½»¸ü¸Ä
-4. ÍÆËÍµ½·ÖÖ§
-5. ´´½¨ Pull Request
-
-## Ğí¿ÉÖ¤
+7. é¡¹ç›®éªŒè¯
 MIT License 

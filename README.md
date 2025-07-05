@@ -15,7 +15,7 @@
 
 |              | 技术                                                                  |
 | ------------ | --------------------------------------------------------------------- |
-| **后端**     | Python 3, Flask, SQLAlchemy, Flask-Migrate, Flask-JWT-Extended        |
+| **后端**     | Python 3, Flask, PyMySQL, Flask-Migrate, Flask-JWT-Extended        |
 | **前端**     | Vue 3 (Composition API), TypeScript, Element Plus, Pinia, Vue Router, Axios |
 | **数据库**   | MySQL                                                                 |
 | **开发工具** | Node.js, npm, pip, virtualenv                                         |
@@ -27,7 +27,7 @@
 ### 准备工作
 
 - 确保您的电脑已安装 [Node.js](https://nodejs.org/) (v16+ 版本)
-- 确保您的电脑已安装 [Python](https://www.python.org/) (v3.8+ 版本)
+- 确保您的电脑已安装 [Python](https://www.python.org/) (v3.9+ 版本)
 - 确保您的电脑已安装并运行 [MySQL](https://www.mysql.com/) 服务
 
 ### 后端服务启动
@@ -86,8 +86,14 @@ system/
 │   ├── app.py          # 应用主文件
 │   ├── cli.py          # 自定义 Flask 命令
 │   ├── config.py       # 配置文件
-│   ├── models.py       # 数据库模型
-│   └── routes/         # API 路由蓝图
+│   ├── extensions.py   # 扩展初始化
+│   ├── db_connection.py # 数据库连接管理
+│   ├── models_pymysql.py # 数据模型
+│   ├── sql/            # SQL相关文件
+│   │   ├── queries.py   # SQL查询语句
+│   │   └── schema.sql   # 数据库架构
+│   ├── routes/         # API 路由蓝图
+│   └── utils/          # 工具函数
 ├── frontend/           # Vue.js 前端源代码
 │   ├── src/
 │   │   ├── components/ # 可复用组件

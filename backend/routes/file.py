@@ -1,9 +1,9 @@
-from flask import Blueprint, request, jsonify, current_app, send_from_directory
-
+from flask import Blueprint, request, current_app, send_from_directory
 from flask_jwt_extended import jwt_required
 import os
 import uuid
 from werkzeug.utils import secure_filename
+from utils.route_utils import APIResponse, handle_exceptions
 
 file_bp = Blueprint('file', __name__)
 
@@ -13,6 +13,7 @@ def allowed_file(filename):
 
 @file_bp.route('/files/upload', methods=['POST'])
 @jwt_required()
+@handle_exceptions
 def upload_file():
     """
     上传文件
@@ -37,14 +38,14 @@ def upload_file():
         description: 上传失败
     """
     if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
+        return APIResponse.error('No file part', 400)
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+        return APIResponse.error('No selected file', 400)
         
     if not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file type'}), 400
+        return APIResponse.error('Invalid file type', 400)
     
     try:
         # 确保上传目录存在
@@ -59,16 +60,12 @@ def upload_file():
         file.save(filepath)
         
         # 返回完整的URL路径
-        return jsonify({
-            'code': 200,
-            'msg': 'success',
-            'data': {
-                'url': f'/api/uploads/{filename}'
-            }
-        }), 200
+        return APIResponse.success(data={
+            'url': f'/api/uploads/{filename}'
+        })
     except Exception as e:
         current_app.logger.error(f"File upload error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return APIResponse.error(str(e), 500)
 
 @file_bp.route('/uploads/<filename>')
 def serve_file(filename):

@@ -51,15 +51,32 @@ export const useTrainingStore = defineStore('training', () => {
   }
 
   const getRegistrations = async (trainingId: number): Promise<Registration[]> => {
-    const response = await request.get<Registration[] | { registrations: Registration[] }>(`/trainings/${trainingId}/registrations`);
-    if (response.code === 200 && response.data) {
+    const response = await request.get(`/trainings/${trainingId}/registrations`);
+    console.log('训练报名数据响应:', response);
+    
+    if (response.code === 200) {
       if (Array.isArray(response.data)) {
-        return response.data;
+        return response.data as Registration[];
       }
-      if (response.data.registrations) {
-        return response.data.registrations;
+      
+      if (typeof response.data === 'object' && response.data !== null) {
+        // 检查data.items
+        if ('items' in response.data && Array.isArray(response.data.items)) {
+          return response.data.items as Registration[];
+        }
+        
+        // 检查data.registrations
+        if ('registrations' in response.data && Array.isArray(response.data.registrations)) {
+          return response.data.registrations as Registration[];
+        }
+        
+        // 如果data本身似乎是注册数组
+        if (Array.isArray(response.data)) {
+          return response.data as Registration[];
+        }
       }
     }
+    
     return [];
   }
 

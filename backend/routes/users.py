@@ -1,8 +1,7 @@
 from flask import Blueprint, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import User, PointHistory
-from extensions import db
-from sqlalchemy import or_, func
+from models_pymysql import User, PointHistory
+from db_connection import db
 from utils.route_utils import (
     APIResponse, validate_required_fields, validate_student_id,
     validate_phone_number, handle_exceptions, validate_json_request,
@@ -31,24 +30,24 @@ def get_user_profile():
     user_id = get_jwt_identity()
     current_app.logger.info(f"Getting profile for user_id: {user_id}")
     
-    user = User.query.get(user_id)
+    user = User.get_by_id(int(user_id))
     if not user:
         return APIResponse.error("User not found", 404)
     
     user_data = {
-        "username": user.username,
-        "name": user.name,
-        "student_id": user.student_id,
-        "college": user.college,
-        "height": user.height,
-        "weight": user.weight,
-        "shoe_size": user.shoe_size,
-        "total_points": user.total_points,
-        "role": user.role,
-        "phone_number": user.phone_number
+        "username": user['username'],
+        "name": user['name'],
+        "student_id": user['student_id'],
+        "college": user['college'],
+        "height": user['height'],
+        "weight": user['weight'],
+        "shoe_size": user['shoe_size'],
+        "total_points": user['total_points'],
+        "role": user['role'],
+        "phone_number": user['phone_number']
     }
     
-    current_app.logger.info(f"Successfully retrieved profile for user: {user.username}")
+    current_app.logger.info(f"Successfully retrieved profile for user: {user['username']}")
     return APIResponse.success(data=user_data)
 
 @users_bp.route('/profile', methods=['PUT'])
@@ -85,7 +84,7 @@ def update_user_profile():
         description: 用户不存在
     """
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    user = User.get_by_id(int(user_id))
     
     if not user:
         return APIResponse.error("User not found", 404)
@@ -93,16 +92,33 @@ def update_user_profile():
     data = request.get_json()
     
     # 只允许更新特定字段
-    allowed_fields = {'height', 'weight', 'shoe_size'}
-    for field in allowed_fields:
-        if field in data:
-            setattr(user, field, data[field])
+    height = user['height']
+    weight = user['weight']
+    shoe_size = user['shoe_size']
     
-    db.session.commit()
+    if 'height' in data:
+        height = data['height']
+    if 'weight' in data:
+        weight = data['weight']
+    if 'shoe_size' in data:
+        shoe_size = data['shoe_size']
+    
+    # 更新用户信息
+    updated_user = User.update(
+        user_id=int(user_id),
+        name=user['name'],
+        college=user['college'],
+        role=user['role'],
+        phone_number=user['phone_number'],
+        height=height,
+        weight=weight,
+        shoe_size=shoe_size
+    )
+    
     return APIResponse.success(data={
-        "height": user.height,
-        "weight": user.weight,
-        "shoe_size": user.shoe_size
+        "height": updated_user['height'],
+        "weight": updated_user['weight'],
+        "shoe_size": updated_user['shoe_size']
     })
 
 @users_bp.route('/points/history', methods=['GET'])
@@ -132,7 +148,7 @@ def get_user_points_history():
         description: 用户不存在
     """
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    user = User.get_by_id(int(user_id))
     
     if not user:
         return APIResponse.error("User not found", 404)
@@ -140,15 +156,22 @@ def get_user_points_history():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     
-    # 获取分页的积分历史记录
-    pagination = PointHistory.query.filter_by(user_id=user_id)\
-        .order_by(PointHistory.change_time.desc())\
-        .paginate(page=page, per_page=per_page)
+    # 获取所有积分历史记录
+    all_history = PointHistory.list_by_user(int(user_id))
+    
+    # 手动分页
+    total = len(all_history)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    start_idx = (page - 1) * per_page
+    end_idx = min(start_idx + per_page, total)
+    
+    # 获取当前页的记录
+    current_page_items = all_history[start_idx:end_idx] if start_idx < total else []
     
     return APIResponse.success(data={
-        "items": [item.to_dict() for item in pagination.items],
-        "total": pagination.total,
-        "pages": pagination.pages,
+        "items": current_page_items,
+        "total": total,
+        "pages": total_pages,
         "current_page": page
     })
 
@@ -176,19 +199,11 @@ def search_users():
     query = request.args.get('query', '')
     if not query:
         return APIResponse.success(data=[])
-        
-    search_term = f'%{query.lower()}%'
     
     # 搜索用户名、姓名或学号包含关键词的用户
-    users = User.query.filter(
-        or_(
-            func.lower(User.username).like(search_term),
-            func.lower(User.name).like(search_term),
-            func.lower(User.student_id).like(search_term)
-        )
-    ).limit(10).all()
+    users = User.search(query)
     
-    return APIResponse.success(data=[user.to_dict() for user in users])
+    return APIResponse.success(data=users)
 
 @users_bp.route('/points/all', methods=['GET'])
 @jwt_required()
@@ -211,38 +226,114 @@ def get_all_users_points():
         in: query
         type: integer
         default: 10
-      - name: query
+      - name: sort
         in: query
         type: string
-        description: 搜索关键词（用户名、姓名或学号）
+        default: points_desc
+        description: 排序方式，可选值：points_desc, points_asc, name_asc, name_desc
     responses:
       200:
         description: 成功获取用户积分列表
-      403:
-        description: 权限不足
     """
+    # 获取查询参数
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    sort_by = request.args.get('sort', 'points_desc')
+    
+    # 获取所有用户
+    all_users = User.list_all()
+    
+    # 根据排序参数对用户进行排序
+    if sort_by == 'points_desc':
+        all_users.sort(key=lambda u: float(u['total_points'] or 0), reverse=True)
+    elif sort_by == 'points_asc':
+        all_users.sort(key=lambda u: float(u['total_points'] or 0))
+    elif sort_by == 'name_asc':
+        all_users.sort(key=lambda u: u['name'])
+    elif sort_by == 'name_desc':
+        all_users.sort(key=lambda u: u['name'], reverse=True)
+    
+    # 手动分页
+    total = len(all_users)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    start_idx = (page - 1) * per_page
+    end_idx = min(start_idx + per_page, total)
+    
+    # 获取当前页的用户
+    current_page_users = all_users[start_idx:end_idx] if start_idx < total else []
+    
+    # 提取需要的字段，确保包含手机号
+    result_users = []
+    for user in current_page_users:
+        result_users.append({
+            'user_id': user['user_id'],
+            'username': user['username'],
+            'name': user['name'],
+            'student_id': user['student_id'],
+            'college': user['college'],
+            'total_points': user['total_points'],
+            'role': user['role'],
+            'phone_number': user['phone_number']
+        })
+    
+    return APIResponse.success(data={
+        'items': result_users,
+        'total': total,
+        'pages': total_pages,
+        'current_page': page
+    })
+
+@users_bp.route('', methods=['GET'])
+@jwt_required()
+@role_required('superadmin', 'admin')
+@handle_exceptions
+def get_users():
+    """
+    获取所有用户（仅管理员）
+    ---
+    tags:
+      - 用户
+    security:
+      - Bearer: []
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: per_page
+        in: query
+        type: integer
+        default: 10
+      - name: query
+        in: query
+        type: string
+        description: 搜索关键词
+    responses:
+      200:
+        description: 成功获取用户列表
+    """
+    # 获取查询参数
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     query = request.args.get('query', '')
     
-    # 构建查询
-    user_query = User.query
-    if query:
-        user_query = user_query.filter(
-            (User.username.ilike(f'%{query}%')) |
-            (User.name.ilike(f'%{query}%')) |
-            (User.student_id.ilike(f'%{query}%'))
-        )
+    # 根据查询条件获取用户
+    all_users = User.search(query) if query else User.list_all()
     
-    # 分页查询
-    pagination = user_query.order_by(User.total_points.desc())\
-        .paginate(page=page, per_page=per_page)
+    # 手动分页
+    total = len(all_users)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    start_idx = (page - 1) * per_page
+    end_idx = min(start_idx + per_page, total)
+    
+    # 获取当前页的用户
+    current_page_users = all_users[start_idx:end_idx] if start_idx < total else []
     
     return APIResponse.success(data={
-        "items": [user.to_dict() for user in pagination.items],
-        "total": pagination.total,
-        "pages": pagination.pages,
-        "current_page": page
+        'items': current_page_users,
+        'total': total,
+        'pages': total_pages,
+        'current_page': page
     })
 
 @users_bp.route('', methods=['POST'])
@@ -252,7 +343,7 @@ def get_all_users_points():
 @handle_exceptions
 def create_user():
     """
-    创建新用户（仅管理员）
+    创建用户（仅超级管理员）
     ---
     tags:
       - 用户
@@ -277,21 +368,19 @@ def create_user():
               type: string
             role:
               type: string
-              enum: [admin, member]
+              enum: [member, admin]
             phone_number:
               type: string
     responses:
       201:
-        description: 用户创建成功
+        description: 创建成功
       400:
         description: 参数错误
-      403:
-        description: 权限不足
     """
     data = request.get_json()
     
     # 验证必填字段
-    required_fields = ['username', 'password', 'name', 'student_id', 'college']
+    required_fields = ['username', 'password', 'name', 'student_id', 'college', 'role']
     is_valid, error_msg = validate_required_fields(data, required_fields)
     if not is_valid:
         return APIResponse.error(error_msg, 400)
@@ -307,43 +396,29 @@ def create_user():
         if not is_valid:
             return APIResponse.error(error_msg, 400)
     
-    # 检查角色是否有效
-    role = data.get('role', 'member')
-    if role not in ['admin', 'member']:
-        return APIResponse.error(f"Invalid role: {role}", 400)
-    
     # 检查用户名是否已存在
-    if User.query.filter_by(username=data['username']).first():
+    if User.get_by_username(data['username']):
         return APIResponse.error("Username already exists", 400)
     
     # 检查学号是否已存在
-    if User.query.filter_by(student_id=data['student_id']).first():
+    if User.get_by_student_id(data['student_id']):
         return APIResponse.error("Student ID already exists", 400)
     
-    try:
-        user = User(
-            username=data['username'],
-            name=data['name'],
-            student_id=data['student_id'],
-            college=data['college'],
-            role=data.get('role', 'member'),
-            phone_number=data.get('phone_number')
-        )
-        if not user.set_password(data['password']):
-            return APIResponse.error("Failed to set password", 500)
-        
-        db.session.add(user)
-        db.session.commit()
-        
-        return APIResponse.success(
-            data=user.to_dict(),
-            msg="User created successfully",
-            code=201
-        )
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error creating user: {str(e)}")
-        return APIResponse.error("Error creating user", 500)
+    # 创建用户
+    user = User.create(
+        username=data['username'],
+        password=data['password'],
+        role=data['role'],
+        name=data['name'],
+        student_id=data['student_id'],
+        college=data['college'],
+        phone_number=data.get('phone_number')
+    )
+    
+    if not user:
+        return APIResponse.error("Failed to create user", 500)
+    
+    return APIResponse.success(data=User.to_dict(user), msg="User created successfully", code=201)
 
 @users_bp.route('/<int:user_id>/role', methods=['PUT'])
 @jwt_required()
@@ -352,7 +427,7 @@ def create_user():
 @handle_exceptions
 def update_user_role(user_id):
     """
-    更新用户角色（仅管理员）
+    更新用户角色（仅超级管理员）
     ---
     tags:
       - 用户
@@ -361,8 +436,8 @@ def update_user_role(user_id):
     parameters:
       - name: user_id
         in: path
-        type: integer
         required: true
+        type: integer
       - name: body
         in: body
         required: true
@@ -371,45 +446,42 @@ def update_user_role(user_id):
           properties:
             role:
               type: string
-              enum: [admin, member]
+              enum: [member, admin, superadmin]
     responses:
       200:
-        description: 角色更新成功
+        description: 更新成功
       400:
         description: 参数错误
-      403:
-        description: 权限不足
       404:
         description: 用户不存在
     """
     data = request.get_json()
     
-    if 'role' not in data:
-        return APIResponse.error("Role is required", 400)
-    
-    if data['role'] not in ['admin', 'member']:
+    # 验证角色参数
+    if 'role' not in data or data['role'] not in ['member', 'admin', 'superadmin']:
         return APIResponse.error("Invalid role", 400)
     
-    user = User.query.get(user_id)
+    # 获取用户
+    user = User.get_by_id(user_id)
     if not user:
         return APIResponse.error("User not found", 404)
     
-    new_role = data.get('role')
-    if not new_role or new_role not in ['admin', 'member']:
-        return APIResponse.error("Invalid or missing role. Can only set to 'admin' or 'member'.", 400)
+    # 更新用户角色
+    updated_user = User.update(
+        user_id=user_id,
+        name=user['name'],
+        college=user['college'],
+        role=data['role'],
+        phone_number=user['phone_number'],
+        height=user['height'],
+        weight=user['weight'],
+        shoe_size=user['shoe_size']
+    )
     
-    # 防止最后一个超级管理员将自己降级
-    if user.user_id == get_jwt_identity() and user.role == 'superadmin' and new_role != 'superadmin':
-        return APIResponse.error("Superadmin cannot demote themselves.", 400)
-
-    try:
-        user.role = new_role
-        db.session.commit()
-        return APIResponse.success(data=user.to_dict())
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error updating user role: {str(e)}")
-        return APIResponse.error("Error updating user role", 500)
+    if not updated_user:
+        return APIResponse.error("Failed to update user role", 500)
+    
+    return APIResponse.success(data={"role": updated_user['role']})
 
 @users_bp.route('/<int:user_id>', methods=['PUT'])
 @jwt_required()
@@ -427,8 +499,8 @@ def update_user(user_id):
     parameters:
       - name: user_id
         in: path
-        type: integer
         required: true
+        type: integer
       - name: body
         in: body
         required: true
@@ -446,26 +518,40 @@ def update_user(user_id):
         description: 更新成功
       400:
         description: 参数错误
-      403:
-        description: 权限不足
       404:
         description: 用户不存在
     """
     data = request.get_json()
-    user = User.query.get(user_id)
     
+    # 获取用户
+    user = User.get_by_id(user_id)
     if not user:
         return APIResponse.error("User not found", 404)
-
-    # 如果有角色变更，则拒绝，因为此端点不能用于更改角色
-    if 'role' in data and data['role'] != user.role:
-        return APIResponse.error("Cannot change role via this endpoint. Use the dedicated /role endpoint.", 403)
-        
-    # 更新允许的字段
-    allowed_fields = ['username', 'name', 'student_id', 'college', 'phone_number']
-    for field in allowed_fields:
-        if field in data:
-            setattr(user, field, data[field])
     
-    db.session.commit()
-    return APIResponse.success(data=user.to_dict()) 
+    # 验证手机号格式
+    if data.get('phone_number'):
+        is_valid, error_msg = validate_phone_number(data['phone_number'])
+        if not is_valid:
+            return APIResponse.error(error_msg, 400)
+    
+    # 更新字段
+    name = data.get('name', user['name'])
+    college = data.get('college', user['college'])
+    phone_number = data.get('phone_number', user['phone_number'])
+    
+    # 更新用户
+    updated_user = User.update(
+        user_id=user_id,
+        name=name,
+        college=college,
+        role=user['role'],
+        phone_number=phone_number,
+        height=user['height'],
+        weight=user['weight'],
+        shoe_size=user['shoe_size']
+    )
+    
+    if not updated_user:
+        return APIResponse.error("Failed to update user", 500)
+    
+    return APIResponse.success(data=User.to_dict(updated_user)) 

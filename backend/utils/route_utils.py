@@ -1,7 +1,7 @@
 from functools import wraps
 from flask import jsonify, current_app, request
 from flask_jwt_extended import get_jwt_identity
-from models import User
+from models_pymysql import User
 import logging
 
 logger = logging.getLogger(__name__)
@@ -100,8 +100,8 @@ def role_required(*roles):
                     }), 401
                 
                 # 查找用户
-                user = User.query.get(user_id)
-                current_app.logger.info(f"User found: {user.username if user else 'None'}")
+                user = User.get_by_id(int(user_id))
+                current_app.logger.info(f"User found: {user['username'] if user else 'None'}")
                 
                 if not user:
                     current_app.logger.warning(f"User not found for ID: {user_id}")
@@ -111,9 +111,9 @@ def role_required(*roles):
                     }), 401
                 
                 # 检查用户角色
-                current_app.logger.info(f"User role: {user.role}, Required roles: {roles}")
-                if user.role not in roles:
-                    current_app.logger.warning(f"Permission denied: User role '{user.role}' not in required roles {roles}")
+                current_app.logger.info(f"User role: {user['role']}, Required roles: {roles}")
+                if user['role'] not in roles:
+                    current_app.logger.warning(f"Permission denied: User role '{user['role']}' not in required roles {roles}")
                     return jsonify({
                         'message': 'Permission denied',
                         'code': 403

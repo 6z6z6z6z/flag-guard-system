@@ -129,7 +129,11 @@
       title="报名人员名单"
       width="1000px"
     >
+      <div v-if="registrations.length === 0 && !registrationsLoading" class="empty-data">
+        <el-empty description="暂无报名人员"></el-empty>
+      </div>
       <el-table 
+        v-else
         :data="registrations" 
         style="width: 100%" 
         v-loading="registrationsLoading"
@@ -140,10 +144,27 @@
         <el-table-column prop="username" label="用户名" min-width="120" />
         <el-table-column prop="student_id" label="学号" min-width="120" />
         <el-table-column prop="college" label="学院" min-width="150" />
-        <el-table-column prop="height" label="身高(cm)" min-width="100" />
-        <el-table-column prop="weight" label="体重(kg)" min-width="100" />
-        <el-table-column prop="shoe_size" label="鞋码" min-width="100" />
         <el-table-column prop="phone_number" label="电话号码" min-width="150" />
+        <el-table-column label="身高(cm)" min-width="100">
+          <template #default="scope">
+            {{ scope.row.height || '未填写' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="体重(kg)" min-width="100">
+          <template #default="scope">
+            {{ scope.row.weight || '未填写' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="鞋码" min-width="100">
+          <template #default="scope">
+            {{ scope.row.shoe_size || '未填写' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="报名时间" min-width="150">
+          <template #default="scope">
+            {{ scope.row.created_at ? new Date(scope.row.created_at).toLocaleString() : '未知' }}
+          </template>
+        </el-table-column>
       </el-table>
     </el-dialog>
   </div>
@@ -434,26 +455,52 @@ const registrationsDialogVisible = ref(false)
 const registrationsLoading = ref(false)
 const registrations = ref<any[]>([])
 
-// 显示报名人员名单
+    // 显示报名人员名单
 const showRegistrations = async (row: Event) => {
   try {
     registrationsLoading.value = true
     registrationsDialogVisible.value = true
     
     const response = await request.get(`/events/${row.event_id}/registrations`)
-    console.log('获取报名人员名单响应:', response.data)  // 添加调试日志
+    console.log('获取报名人员名单响应:', response)  // 添加调试日志
     
-    if (response.data && Array.isArray(response.data)) {
-      registrations.value = response.data.map((reg: any) => ({
+    // 打印详细的人员信息以便调试
+    if (response.data && response.data.items) {
+      console.log('报名人员详细信息:', JSON.stringify(response.data.items))
+    }
+    
+    // 标准化处理响应数据，确保所有可能的返回格式都能被正确处理
+    if (response.data) {
+      let registrationItems: any[] = []
+      
+      // 处理嵌套的数据格式
+      if (response.data.items) {
+        registrationItems = response.data.items
+      } else if (response.data.data && response.data.data.items) {
+        registrationItems = response.data.data.items
+      } 
+      // 处理直接数组格式
+      else if (Array.isArray(response.data)) {
+        registrationItems = response.data
+      }
+      // 处理嵌套在data中的数组
+      else if (response.data.data && Array.isArray(response.data.data)) {
+        registrationItems = response.data.data
+      }
+      
+      // 确保每条记录都有created_at字段
+      registrations.value = registrationItems.map((reg: any) => ({
         ...reg,
-        created_at: new Date().toLocaleString()  // 添加报名时间
+        created_at: reg.created_at ? new Date(reg.created_at).toLocaleString() : new Date().toLocaleString()
       }))
+      
+      console.log('处理后的报名数据:', registrations.value)
     } else {
-      console.warn('无效的报名人员数据格式:', response.data)  // 添加调试日志
+      console.warn('无效的报名人员数据格式')
       registrations.value = []
     }
   } catch (error: any) {
-    console.error('获取报名人员名单失败:', error)  // 添加调试日志
+    console.error('获取报名人员名单失败:', error)
     ElMessage.error(error.response?.data?.msg || '获取报名人员名单失败')
   } finally {
     registrationsLoading.value = false
@@ -564,5 +611,10 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+.empty-data {
+  padding: 30px 0;
+  text-align: center;
 }
 </style> 

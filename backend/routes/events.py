@@ -1,12 +1,13 @@
 from flask import Blueprint, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
-from models import Event, Training, EventRegistration, PointHistory
-from extensions import db
+from models_pymysql import Event, Training, EventRegistration, PointHistory, User, EventTraining
+from db_connection import db
 from utils.route_utils import (
     APIResponse, validate_required_fields, handle_exceptions,
     validate_json_request, role_required
 )
+from sql.queries import EVENT_QUERIES, EVENT_REGISTRATION_QUERIES, EVENT_TRAINING_QUERIES
 
 bp = Blueprint('events', __name__)
 
@@ -37,32 +38,47 @@ def get_events():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     
-    query = Event.query.order_by(Event.time.desc())
-    pagination = query.paginate(page=page, per_page=per_page)
+    # 获取所有活动
+    events = Event.list_all()
     
+    # 手动分页
+    total = len(events)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    start_idx = (page - 1) * per_page
+    end_idx = min(start_idx + per_page, total)
+    
+    # 获取当前页的活动
+    current_page_events = events[start_idx:end_idx] if start_idx < total else []
+    
+    # 格式化活动数据
     items = []
-    for event in pagination.items:
-        event_dict = event.to_dict()
-        event_dict['trainings'] = [{
-            'training_id': t.training_id,
-            'name': t.name,
-            'type': t.type
-        } for t in event.trainings]
+    user_id = int(get_jwt_identity())
+    
+    for event in current_page_events:
+        event_dict = Event.format_dict(event)
+        
+        # 获取关联的训练
+        trainings_query = """
+            SELECT t.training_id, t.name, t.status as type 
+            FROM event_trainings et
+            JOIN trainings t ON et.training_id = t.training_id
+            WHERE et.event_id = %s
+        """
+        trainings = db.execute_query(trainings_query, (event['event_id'],))
+        
+        event_dict['trainings'] = trainings
         
         # 检查当前用户是否已报名
-        registration = EventRegistration.query.filter_by(
-            event_id=event.event_id,
-            user_id=get_jwt_identity()
-        ).first()
+        registration = EventRegistration.get_by_event_and_user(event['event_id'], user_id)
         event_dict['is_registered'] = registration is not None
-        event_dict['location'] = event.location or '未设置'
+        event_dict['location'] = event['location'] or '未设置'
         
         items.append(event_dict)
     
     return APIResponse.success(data={
         'items': items,
-        'total': pagination.total,
-        'pages': pagination.pages,
+        'total': total,
+        'pages': total_pages,
         'current_page': page
     })
 
@@ -115,30 +131,27 @@ def create_event():
     
     try:
         # 创建活动
-        event = Event(
+        event = Event.create(
             name=data['name'],
             time=datetime.fromisoformat(data['time'].replace('Z', '+00:00')),
             location=data.get('location'),
             uniform_required=data.get('uniform_required'),
             created_by=get_jwt_identity()
         )
-        db.session.add(event)
         
         # 关联训练
         if data.get('trainings'):
-            trainings = Training.query.filter(Training.training_id.in_(data['trainings'])).all()
-            event.trainings.extend(trainings)
+            for training_id in data['trainings']:
+                EventTraining.add(event['event_id'], training_id)
         
-        db.session.commit()
         return APIResponse.success(
-            data=event.to_dict(),
+            data=event,
             msg="活动创建成功",
             code=201
         )
     except ValueError as e:
         return APIResponse.error(f"Invalid date format: {str(e)}", 400)
     except Exception as e:
-        db.session.rollback()
         current_app.logger.error(f"Failed to create event: {str(e)}")
         return APIResponse.error("Failed to create event", 500)
 
@@ -187,10 +200,15 @@ def update_event(event_id):
       404:
         description: 活动不存在
     """
-    event = Event.query.get_or_404(event_id)
+    event = Event.get_by_id(event_id)
+    if not event:
+        return APIResponse.error("活动不存在", 404)
     
     # 检查是否为过期活动
-    if event.time < datetime.utcnow():
+    event_time = event['time']
+    if isinstance(event_time, str):
+        event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
+    if event_time < datetime.utcnow():
         return APIResponse.error("不能修改已过期的活动", 400)
     
     data = request.get_json()
@@ -203,23 +221,28 @@ def update_event(event_id):
     
     try:
         # 更新基本信息
-        event.name = data['name']
-        event.time = datetime.fromisoformat(data['time'].replace('Z', '+00:00'))
-        event.location = data.get('location')
-        event.uniform_required = data.get('uniform_required')
+        updated_event = Event.update(
+            event_id=event_id,
+            name=data['name'],
+            time=datetime.fromisoformat(data['time'].replace('Z', '+00:00')),
+            location=data.get('location'),
+            uniform_required=data.get('uniform_required')
+        )
         
         # 更新关联训练
-        event.trainings = []
-        if data.get('trainings'):
-            trainings = Training.query.filter(Training.training_id.in_(data['trainings'])).all()
-            event.trainings.extend(trainings)
+        # 先删除所有已关联的训练
+        delete_trainings_query = "DELETE FROM event_trainings WHERE event_id = %s"
+        db.execute_update(delete_trainings_query, (event_id,))
         
-        db.session.commit()
-        return APIResponse.success(data=event.to_dict())
+        # 添加新的关联训练
+        if data.get('trainings'):
+            for training_id in data['trainings']:
+                EventTraining.add(event_id, training_id)
+        
+        return APIResponse.success(data=updated_event)
     except ValueError as e:
         return APIResponse.error(f"Invalid date format: {str(e)}", 400)
     except Exception as e:
-        db.session.rollback()
         current_app.logger.error(f"Failed to update event: {str(e)}")
         return APIResponse.error("Failed to update event", 500)
 
@@ -248,21 +271,24 @@ def delete_event(event_id):
       404:
         description: 活动不存在
     """
-    event = Event.query.get_or_404(event_id)
+    event = Event.get_by_id(event_id)
+    if not event:
+        return APIResponse.error("活动不存在", 404)
     
     try:
-        # 先删除所有相关的报名记录
-        registrations = EventRegistration.query.filter_by(event_id=event_id).all()
-        for registration in registrations:
-            db.session.delete(registration)
+        # 删除活动关联的训练记录
+        delete_trainings_query = "DELETE FROM event_trainings WHERE event_id = %s"
+        db.execute_update(delete_trainings_query, (event_id,))
+        
+        # 删除活动的报名记录
+        delete_registrations_query = "DELETE FROM event_registrations WHERE event_id = %s"
+        db.execute_update(delete_registrations_query, (event_id,))
         
         # 删除活动
-        db.session.delete(event)
-        db.session.commit()
+        Event.delete(event_id)
         
         return APIResponse.success(msg="活动删除成功")
     except Exception as e:
-        db.session.rollback()
         current_app.logger.error(f"Failed to delete event: {str(e)}")
         return APIResponse.error("Failed to delete event", 500)
 
@@ -285,43 +311,45 @@ def register_for_event(event_id):
     responses:
       201:
         description: 报名成功
+      400:
+        description: 已报名或活动已过期
       404:
         description: 活动不存在
-      409:
-        description: 用户已报名
-      410:
-        description: 活动已过期
     """
-    event = Event.query.get_or_404(event_id)
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     
-    # 检查活动是否已过期
-    if event.time < datetime.utcnow():
-        return APIResponse.error("活动已过期，无法报名", 410)
+    # 检查活动是否存在
+    event = Event.get_by_id(event_id)
+    if not event:
+        return APIResponse.error("活动不存在", 404)
     
-    # 检查用户是否已报名
-    existing_registration = EventRegistration.query.filter_by(
-        event_id=event_id, user_id=user_id
-    ).first()
+    # 检查是否为过期活动
+    event_time = event['time']
+    if isinstance(event_time, str):
+        event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
+    if event_time < datetime.utcnow():
+        return APIResponse.error("不能报名已过期的活动", 400)
     
+    # 检查是否已经报名
+    existing_registration = EventRegistration.get_by_event_and_user(event_id, user_id)
     if existing_registration:
-        return APIResponse.error(msg="您已报名该活动", code=409)
+        return APIResponse.error("你已经报名参加此活动", 400)
     
     try:
         # 创建报名记录
-        registration = EventRegistration(event_id=event_id, user_id=user_id)
-        db.session.add(registration)
-        db.session.commit()
+        registration = EventRegistration.create(
+            event_id=event_id,
+            user_id=user_id
+        )
         
         return APIResponse.success(
-            msg="报名成功", 
-            data={'registration_id': registration.registration_id}, 
+            data=registration,
+            msg="报名成功",
             code=201
         )
     except Exception as e:
-        db.session.rollback()
         current_app.logger.error(f"Failed to register for event: {str(e)}")
-        return APIResponse.error(msg="报名时发生错误", code=500)
+        return APIResponse.error("报名失败", 500)
 
 @bp.route('/<int:event_id>/register', methods=['DELETE'])
 @jwt_required()
@@ -341,28 +369,38 @@ def cancel_event_registration(event_id):
         required: true
     responses:
       200:
-        description: 成功取消活动报名
+        description: 取消报名成功
+      400:
+        description: 未报名或活动已过期
       404:
-        description: 未找到有效的报名记录
+        description: 活动不存在
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     
-    # 查找注册记录
-    registration = EventRegistration.query.filter_by(
-        event_id=event_id,
-        user_id=user_id,
-        status='registered'
-    ).first_or_404()
+    # 检查活动是否存在
+    event = Event.get_by_id(event_id)
+    if not event:
+        return APIResponse.error("活动不存在", 404)
+    
+    # 检查是否为过期活动
+    event_time = event['time']
+    if isinstance(event_time, str):
+        event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
+    if event_time < datetime.utcnow():
+        return APIResponse.error("不能取消已过期活动的报名", 400)
+    
+    # 检查是否已经报名
+    registration = EventRegistration.get_by_event_and_user(event_id, user_id)
+    if not registration:
+        return APIResponse.error("你未报名参加此活动", 400)
     
     try:
         # 删除报名记录
-        db.session.delete(registration)
-        db.session.commit()
-        return APIResponse.success(msg="成功取消活动报名")
+        EventRegistration.delete(registration['registration_id'])
+        return APIResponse.success(msg="取消报名成功")
     except Exception as e:
-        db.session.rollback()
         current_app.logger.error(f"Failed to cancel event registration: {str(e)}")
-        return APIResponse.error("Failed to cancel registration", 500)
+        return APIResponse.error("取消报名失败", 500)
 
 @bp.route('/<int:event_id>/registrations', methods=['GET'])
 @jwt_required()
@@ -370,7 +408,7 @@ def cancel_event_registration(event_id):
 @handle_exceptions
 def get_event_registrations(event_id):
     """
-    获取活动报名人员名单
+    获取活动报名列表
     ---
     tags:
       - 活动
@@ -381,39 +419,85 @@ def get_event_registrations(event_id):
         in: path
         type: integer
         required: true
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: per_page
+        in: query
+        type: integer
+        default: 10
     responses:
       200:
-        description: 报名人员名单
+        description: 报名列表
       403:
         description: 权限不足
       404:
         description: 活动不存在
     """
-    event = Event.query.get_or_404(event_id)
+    # 检查活动是否存在
+    event = Event.get_by_id(event_id)
+    if not event:
+        return APIResponse.error("活动不存在", 404)
     
-    # 获取所有报名记录，按创建时间排序
-    registrations = EventRegistration.query.filter_by(event_id=event_id).order_by(EventRegistration.created_at.desc()).all()
+    # 获取分页参数
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
     
-    # 获取报名用户信息
-    registration_list = []
-    for reg in registrations:
-        user = reg.user
-        registration_list.append({
-            'registration_id': reg.registration_id,
-            'user_id': user.user_id,
-            'username': user.username,
-            'name': user.name,
-            'student_id': user.student_id,
-            'college': user.college,
-            'height': user.height,
-            'weight': user.weight,
-            'shoe_size': user.shoe_size,
-            'phone_number': user.phone_number,
-            'status': reg.status,
-            'created_at': reg.created_at.isoformat() if reg.created_at else None
+    try:
+        # 获取活动的报名记录
+        registrations = EventRegistration.list_by_event(event_id)
+        
+        # 检查每条记录，确保身高、体重、鞋码字段有值
+        for reg in registrations:
+            current_app.logger.info(f"单条报名记录数据: height={reg.get('height')}, weight={reg.get('weight')}, shoe_size={reg.get('shoe_size')}")
+        
+        # 确保数据格式化正确，特别注意身高、体重和鞋码字段
+        formatted_registrations = []
+        current_app.logger.info(f"活动 {event_id} 报名记录原始数据: {registrations}")
+        
+        for reg in registrations:
+            # 确保每个注册记录包含所有必要的字段，确保身高、体重、鞋码字段存在
+            formatted_reg = {
+                'registration_id': reg.get('registration_id'),
+                'event_id': reg.get('event_id'),
+                'user_id': reg.get('user_id'),
+                'status': reg.get('status'),
+                'created_at': reg.get('created_at'),
+                'name': reg.get('name'),
+                'student_id': reg.get('student_id'),
+                'college': reg.get('college'),
+                'username': reg.get('username'),
+                'phone_number': reg.get('phone_number'),
+                'height': reg.get('height'),  # 确保身高字段存在
+                'weight': reg.get('weight'),  # 确保体重字段存在
+                'shoe_size': reg.get('shoe_size')  # 确保鞋码字段存在
+            }
+            formatted_registrations.append(formatted_reg)
+            
+        current_app.logger.info(f"活动 {event_id} 报名记录格式化后: {formatted_registrations}")
+        
+        # 手动分页
+        total = len(formatted_registrations)
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+        start_idx = (page - 1) * per_page
+        end_idx = min(start_idx + per_page, total)
+        
+        # 获取当前页的记录
+        current_page_items = formatted_registrations[start_idx:end_idx] if start_idx < total else []
+        
+        current_app.logger.info(f"返回活动 {event_id} 的报名列表: {len(current_page_items)} 条记录")
+        
+        return APIResponse.success(data={
+            'items': current_page_items,
+            'total': total,
+            'pages': total_pages,
+            'current_page': page
         })
     
-    return APIResponse.success(data=registration_list)
+    except Exception as e:
+        current_app.logger.error(f"获取活动 {event_id} 的报名列表失败: {str(e)}")
+        return APIResponse.error(f"获取报名列表失败: {str(e)}", 500)
 
 @bp.route('/<int:event_id>/points', methods=['POST'])
 @jwt_required()
@@ -422,7 +506,7 @@ def get_event_registrations(event_id):
 @handle_exceptions
 def add_event_points(event_id):
     """
-    添加活动积分
+    为参加活动的用户添加积分
     ---
     tags:
       - 活动
@@ -433,43 +517,62 @@ def add_event_points(event_id):
         in: path
         type: integer
         required: true
-      - name: points
-        in: query
-        type: integer
+      - name: body
+        in: body
         required: true
+        schema:
+          type: object
+          properties:
+            points:
+              type: number
+            description:
+              type: string
     responses:
       200:
-        description: 活动积分添加成功
+        description: 积分添加成功
       400:
-        description: 参数错误或活动已过期
+        description: 参数错误
       403:
         description: 权限不足
       404:
         description: 活动不存在
     """
-    event = Event.query.get_or_404(event_id)
-    user_id = get_jwt_identity()
+    # 检查活动是否存在
+    event = Event.get_by_id(event_id)
+    if not event:
+        return APIResponse.error("活动不存在", 404)
     
-    # 检查活动时间是否已过
-    if event.time < datetime.utcnow():
-        return APIResponse.error("活动已过期", 400)
+    data = request.get_json()
     
-    points = request.args.get('points', 0, type=int)
+    # 验证必填字段
+    required_fields = ['points', 'description']
+    is_valid, error_msg = validate_required_fields(data, required_fields)
+    if not is_valid:
+        return APIResponse.error(error_msg, 400)
+    
+    points = data['points']
+    description = data['description']
     
     try:
-        # 添加积分记录
-        history = PointHistory(
-            user_id=user_id,
-            points_change=points,
-            change_type='event',
-            description=f'参加活动：{event.name}（{"出勤" if attendance_status == "present" else "迟到" if attendance_status == "late" else "早退" if attendance_status == "early_leave" else "未到"}）',
-            related_id=event_id
-        )
-        db.session.add(history)
-        db.session.commit()
+        # 获取活动的所有报名记录
+        registrations = EventRegistration.list_by_event(event_id)
         
-        return APIResponse.success(msg="活动积分添加成功")
+        # 为每个报名用户添加积分
+        success_count = 0
+        for reg in registrations:
+            if User.add_points(
+                user_id=reg['user_id'],
+                points=points,
+                change_type='event',
+                related_id=event_id,
+                description=description
+            ):
+                success_count += 1
+        
+        return APIResponse.success(
+            data={'affected_users': success_count},
+            msg=f"已为{success_count}名用户添加积分"
+        )
     except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Failed to add event points: {str(e)}")
-        return APIResponse.error("Failed to add event points", 500) 
+        current_app.logger.error(f"Failed to add points for event: {str(e)}")
+        return APIResponse.error("添加积分失败", 500) 

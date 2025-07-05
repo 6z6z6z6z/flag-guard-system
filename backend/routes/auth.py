@@ -1,7 +1,6 @@
 from flask import Blueprint, request, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from models import User
-from extensions import db
+from models_pymysql import User
 from utils.route_utils import (
     APIResponse, validate_required_fields, validate_student_id,
     validate_phone_number, handle_exceptions, validate_json_request
@@ -69,40 +68,40 @@ def register():
             return APIResponse.error(error_msg, 400)
     
     # 检查用户名是否已存在
-    if User.query.filter_by(username=data['username']).first():
+    if User.get_by_username(data['username']):
         return APIResponse.error("Username already exists", 400)
     
     # 检查学号是否已存在
-    if User.query.filter_by(student_id=data['student_id']).first():
+    if User.get_by_student_id(data['student_id']):
         return APIResponse.error("Student ID already exists", 400)
     
     try:
         # 检查是否是第一个用户
-        is_first_user = User.query.first() is None
+        all_users = User.list_all()
+        is_first_user = len(all_users) == 0
         
         user_role = 'superadmin' if is_first_user else 'member'
 
-        user = User(
+        user = User.create(
             username=data['username'],
+            password=data['password'],
+            role=user_role,
             name=data['name'],
             student_id=data['student_id'],
             college=data['college'],
-            role=user_role,
             phone_number=data.get('phone_number')
         )
-        if not user.set_password(data['password']):
-            return APIResponse.error("Failed to set password", 500)
         
-        db.session.add(user)
-        db.session.commit()
-        current_app.logger.info(f"User {user.username} registered successfully")
+        if not user:
+            return APIResponse.error("Failed to create user", 500)
+        
+        current_app.logger.info(f"User {user['username']} registered successfully")
         
         # 直接返回成功信息，不生成 token
         return APIResponse.success(msg="User created successfully", code=201)
         
     except Exception as db_error:
         current_app.logger.error(f"Database error during registration: {str(db_error)}")
-        db.session.rollback()
         return APIResponse.error(str(db_error), 500)
 
 @auth_bp.route('/login', methods=['POST'])
@@ -143,29 +142,29 @@ def login():
         return APIResponse.error("Username and password are required", 400)
     
     # 查找用户
-    user = User.query.filter_by(username=username).first()
+    user = User.get_by_username(username)
     if not user:
         current_app.logger.warning(f"Login attempt failed: User not found - {username}")
         return APIResponse.error("Invalid username or password", 401)
     
     # 验证密码
-    if not user.check_password(password):
+    if not User.check_password(user, password):
         current_app.logger.warning(f"Login attempt failed: Invalid password for user - {username}")
         return APIResponse.error("Invalid username or password", 401)
     
     try:
         # 生成 token，确保 user_id 是字符串
-        access_token = create_access_token(identity=str(user.user_id))
+        access_token = create_access_token(identity=str(user['user_id']))
         current_app.logger.info(f"User {username} logged in successfully")
         
         return APIResponse.success(
             data={
                 "token": f"Bearer {access_token}",
                 "user": {
-                    "id": user.user_id,
-                    "username": user.username,
-                    "name": user.name,
-                    "role": user.role
+                    "id": user['user_id'],
+                    "username": user['username'],
+                    "name": user['name'],
+                    "role": user['role']
                 }
             },
             msg="Login successful",
@@ -196,23 +195,23 @@ def get_user_info():
         if not user_id:
             return APIResponse.error('Invalid token', 401)
             
-        user = User.query.get(int(user_id))
+        user = User.get_by_id(int(user_id))
         if not user:
             return APIResponse.error('用户不存在', 404)
             
         # 返回所有关键信息
         user_data = {
-            'id': user.user_id,
-            'username': user.username,
-            'name': user.name,
-            'role': user.role,
-            'college': user.college,
-            'student_id': user.student_id,
-            'phone_number': user.phone_number,
-            'total_points': user.total_points,
-            'height': user.height,
-            'weight': user.weight,
-            'shoe_size': user.shoe_size
+            'id': user['user_id'],
+            'username': user['username'],
+            'name': user['name'],
+            'role': user['role'],
+            'college': user['college'],
+            'student_id': user['student_id'],
+            'phone_number': user['phone_number'],
+            'total_points': user['total_points'],
+            'height': user['height'],
+            'weight': user['weight'],
+            'shoe_size': user['shoe_size']
         }
         return APIResponse.success(data=user_data)
     except Exception as e:

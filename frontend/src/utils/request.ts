@@ -44,15 +44,19 @@ instance.interceptors.request.use(
 
 instance.interceptors.response.use(
   response => {
+    console.log('Response interceptor:', response);
+    
     // 核心修复：如果HTTP状态码为200，但响应体不是我们期望的标准格式
     if (response.status === 200 && (typeof response.data !== 'object' || response.data === null || !('code' in response.data))) {
+      console.log('Wrapping non-standard response format:', response.data);
       // 我们将其包装成标准的成功响应，并放回 response.data 中
       response.data = { code: 200, msg: '操作成功', data: response.data }
       return response
     }
 
     // 对于符合我们标准格式的响应，如果业务码不是200或201，则当作错误处理
-    if (response.data.code && response.data.code !== 200 && response.data.code !== 201) {
+    if (response.data && response.data.code && response.data.code !== 200 && response.data.code !== 201) {
+      console.error('Business error code:', response.data.code, 'Message:', response.data.msg);
       return Promise.reject(new Error(response.data.msg || 'Error'))
     }
     

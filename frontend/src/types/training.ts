@@ -14,10 +14,14 @@ export interface Training {
 
 export interface Registration {
   registration_id: number
+  user_id: number
   student_id: string
   name: string
   college: string
+  phone_number: string
+  username: string
   created_at: string
-  attendance_status: 'present' | 'absent' | 'late' | 'excused' | 'pending'
-  points_awarded: number
+  status: string
+  attendance_status: 'present' | 'absent' | 'late' | 'early_leave' | null
+  points_awarded: number | null
 } 

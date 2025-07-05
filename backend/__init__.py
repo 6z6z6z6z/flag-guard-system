@@ -1,1 +1,1 @@
-from .extensions import db, jwt
+from .extensions import jwt

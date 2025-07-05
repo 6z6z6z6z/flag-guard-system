@@ -35,8 +35,8 @@
           <template #default="scope">
             <el-image
               v-if="scope.row.photo_url"
-              :src="scope.row.photo_url"
-              :preview-src-list="[scope.row.photo_url]"
+              :src="getImageUrl(scope.row.photo_url)"
+              :preview-src-list="[getImageUrl(scope.row.photo_url)]"
               :preview-teleported="true"
               :z-index="9999"
               fit="cover"
@@ -129,16 +129,79 @@ const fetchRecords = async () => {
     })
     console.log('Response:', response)
     
-    if (response.data?.data) {
-      records.value = response.data.data.items.map((item: any) => ({
-        ...item,
-        reviewing: false
-      }))
-      total.value = response.data.data.total
-      console.log('Records loaded:', records.value)
+    if (response.code === 200 && response.data) {
+      // 兼容不同的响应格式
+      let responseData = response.data;
+      
+      // 检查是否有 items 字段，如果没有但 data 字段有 items，使用 data 中的 items
+      if (!responseData.items && responseData.data && responseData.data.items) {
+        responseData = responseData.data;
+      }
+      
+      // 确保有 items 字段
+      if (responseData.items && Array.isArray(responseData.items)) {
+        records.value = responseData.items.map((item: any) => {
+          // 防止空记录
+          if (!item) {
+            console.error('Encountered null or undefined item in response');
+            return {
+              record_id: 0,
+              date: new Date().toISOString().split('T')[0],
+              type: 'raise',
+              status: 'pending',
+              photo_url: '',
+              points_awarded: 0,
+              reviewing: false,
+              user: { name: 'Unknown', student_id: '' }
+            };
+          }
+          
+          // 添加调试信息
+          console.log('Processing record:', item);
+          
+          // 确保每条记录都有基本字段
+          const processedItem = {
+            ...item,
+            reviewing: false,
+            record_id: item.record_id || 0,
+            date: item.date || new Date().toISOString().split('T')[0],
+            type: item.type || 'raise',
+            status: item.status || 'pending',
+            photo_url: item.photo_url || '',
+            points_awarded: item.points_awarded !== undefined ? item.points_awarded : 0,
+            user: item.user || {
+              name: item.user_name || 'Unknown User',
+              student_id: item.student_id || ''
+            }
+          };
+          
+          // 修复 photo_url
+          if (processedItem.photo_url) {
+            // 如果图片URL不是http开头或斜杠开头，添加前缀
+            if (!processedItem.photo_url.startsWith('http') && !processedItem.photo_url.startsWith('/')) {
+              processedItem.photo_url = `/uploads/${processedItem.photo_url}`;
+            } else if (processedItem.photo_url.startsWith('/api/uploads/')) {
+              // 如果URL是/api/uploads/开头，去掉/api前缀
+              processedItem.photo_url = processedItem.photo_url.substring(4);
+            }
+          }
+          
+          return processedItem;
+        });
+        
+        total.value = responseData.total || records.value.length;
+        console.log('Records loaded:', records.value.length);
+      } else {
+        console.error('No items array in response:', responseData);
+        ElMessage.error('获取记录失败：响应格式错误 - 缺少 items 数组');
+        records.value = [];
+        total.value = 0;
+      }
     } else {
-      console.error('Invalid response format:', response)
-      ElMessage.error('获取记录失败：响应格式错误')
+      console.error('Invalid response format:', response);
+      ElMessage.error(response.msg || '获取记录失败：响应格式错误');
+      records.value = [];
+      total.value = 0;
     }
   } catch (error: any) {
     console.error('Error fetching records:', error)
@@ -148,6 +211,8 @@ const fetchRecords = async () => {
       data: error.response?.data
     })
     ElMessage.error(error.response?.data?.msg || '获取记录失败')
+    records.value = [];
+    total.value = 0;
   }
 }
 
@@ -235,6 +300,22 @@ const getStatusText = (status: string) => {
     rejected: '已拒绝'
   }
   return textMap[status] || status
+}
+
+// 获取图片URL
+const getImageUrl = (url: string) => {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  // 后端返回的URL是 /api/uploads/xxx.jpg
+  // 我们需要把它变成 /uploads/xxx.jpg 以便代理
+  if (url.startsWith('/api/uploads/')) {
+    return url.substring(4) // 去掉 /api
+  }
+  if (url.startsWith('/uploads/')) {
+    return url
+  }
+  // 对于历史数据，可能没有前缀
+  return `/uploads/${url.split('/').pop()}`
 }
 
 onMounted(() => {

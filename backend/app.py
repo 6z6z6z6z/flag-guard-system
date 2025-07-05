@@ -6,17 +6,13 @@ from logging.handlers import RotatingFileHandler
 from functools import wraps
 from flask import Flask, jsonify, g, request, current_app, send_from_directory, make_response
 from werkzeug.exceptions import HTTPException
-from sqlalchemy.exc import SQLAlchemyError
 import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import Config, DevelopmentConfig, TestingConfig, ProductionConfig
-from extensions import db, jwt, migrate, init_extensions
+from extensions import jwt, init_extensions
 from flasgger import Swagger
-from models import User, OperationLog
 from flask_cors import CORS
 from cli import init_db, drop_db, create_user, delete_user, list_users, cleanup_records, backup_db, check_system, reset_password, export_data, init_cli
-from flask_migrate import Migrate
-from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
 from routes.auth import auth_bp
@@ -25,6 +21,7 @@ from routes.trainings import bp as trainings_bp
 from routes.events import bp as events_bp
 from routes.points import bp as points_bp
 from routes import register_blueprints
+from db_connection import db  # 新增: 导入pymysql数据库连接
 
 # 创建配置字典
 config = {
@@ -133,15 +130,8 @@ def setup_error_handlers(app):
 
     @app.errorhandler(500)
     def internal_error(error):
-        db.session.rollback()
         app.logger.error(f'Internal server error: {str(error)}')
         return jsonify({'msg': 'Internal server error', 'error': str(error)}), 500
-
-    @app.errorhandler(SQLAlchemyError)
-    def handle_db_error(error):
-        db.session.rollback()
-        app.logger.error(f'Database error: {str(error)}')
-        return jsonify({'msg': 'Database error', 'error': str(error)}), 500
 
     @app.errorhandler(HTTPException)
     def handle_http_error(error):

@@ -136,8 +136,10 @@
       @close="currentTraining = null"
     >
       <el-table :data="currentRegistrations" style="width: 100%" v-loading="registrationsLoading">
-        <el-table-column prop="user.student_id" label="学号" />
-        <el-table-column prop="user.name" label="姓名" />
+        <el-table-column prop="student_id" label="学号" />
+        <el-table-column prop="name" label="姓名" />
+        <el-table-column prop="phone_number" label="电话号码" />
+        <el-table-column prop="college" label="学院" />
         <el-table-column prop="created_at" label="报名时间">
           <template #default="{ row }">
             {{ formatRegistrationTime(row.created_at) }}
@@ -428,8 +430,17 @@ const handleViewRegistrations = async (training: Training) => {
   registrationsLoading.value = true;
   try {
     const response = await api.get(`/trainings/${training.training_id}/registrations`);
+    console.log('训练报名数据响应:', response.data); // 添加调试日志
+    
     if (response.data.code === 200) {
-      currentRegistrations.value = response.data.data as Registration[];
+      if (Array.isArray(response.data.data)) {
+        currentRegistrations.value = response.data.data as Registration[];
+      } else if (response.data.data && response.data.data.items) {
+        currentRegistrations.value = response.data.data.items as Registration[];
+      } else {
+        currentRegistrations.value = [];
+        console.warn('无效的报名数据格式:', response.data);
+      }
     } else {
       ElMessage.error(response.data.msg || '获取报名名单失败');
     }

@@ -8,8 +8,14 @@ load_dotenv()
 class Config:
     """基础配置类"""
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'mysql+pymysql://root:123456@localhost/system'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # MySQL数据库配置
+    MYSQL_HOST = os.environ.get('MYSQL_HOST') or 'localhost'
+    MYSQL_USER = os.environ.get('MYSQL_USER') or 'root'
+    MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD') or '123456'
+    MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE') or 'system'
+    MYSQL_PORT = int(os.environ.get('MYSQL_PORT') or 3306)
+    MYSQL_CHARSET = os.environ.get('MYSQL_CHARSET') or 'utf8mb4'
     
     # JWT配置
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-key'
@@ -28,13 +34,6 @@ class Config:
     # 日志配置
     LOG_LEVEL = 'INFO'
     LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    
-    # 数据库配置
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 10,
-        'pool_recycle': 3600,
-        'pool_pre_ping': True
-    }
     
     # 文件上传配置
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -108,20 +107,18 @@ class Config:
 class DevelopmentConfig(Config):
     """开发环境配置"""
     DEBUG = True
-    SQLALCHEMY_ECHO = True
     SESSION_COOKIE_SECURE = False
     REMEMBER_COOKIE_SECURE = False
 
 class TestingConfig(Config):
     """测试环境配置"""
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:123456@localhost/system_test'
+    MYSQL_DATABASE = 'system_test'
     WTF_CSRF_ENABLED = False
 
 class ProductionConfig(Config):
     """生产环境配置"""
     DEBUG = False
-    SQLALCHEMY_ECHO = False
     
     @classmethod
     def init_app(cls, app):

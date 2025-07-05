@@ -177,7 +177,7 @@ const records = ref<any[]>([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
-const filterStatus = ref('all')
+const filterStatus = ref('')  // 空字符串代表全部
 
 const showSubmitDialog = () => {
   resetForm();
@@ -237,19 +237,26 @@ const customUpload = async (options: any) => {
   formData.append('file', options.file)
 
   try {
-    const response = await request.post('/files/files/upload', formData, {
+    console.log('Uploading file:', options.file.name);
+    
+    const response = await request.post('/files/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     });
+    
+    console.log('Upload response:', response);
 
     if (response.data && response.data.url) {
       flagForm.value.photo_url = response.data.url;
+      console.log('Setting photo URL to:', response.data.url);
       ElMessage.success('上传成功');
     } else {
+      console.error('Invalid upload response format:', response);
       ElMessage.error(response.msg || '上传失败');
     }
   } catch (error: any) {
+    console.error('File upload error:', error);
     ElMessage.error(error.response?.data?.msg || '上传请求失败');
   }
 }
@@ -287,14 +294,85 @@ const fetchRecords = async () => {
       per_page: pageSize.value,
       status: filterStatus.value === 'all' ? undefined : filterStatus.value,
     }
+    console.log('Fetching flag records with params:', params);
+    
     const endpoint = userStore.isAdmin ? '/flag/records/review' : '/flag/records';
+    console.log('Using endpoint:', endpoint);
+    
     const response = await request.get(endpoint, { params })
-    if (response.data) {
-      records.value = response.data.items
-      total.value = response.data.total
+    console.log('Flag records response:', response);
+    
+    if (response.code === 200 && response.data) {
+      let responseData = response.data;
+      
+      // 检查是否有 items 字段，如果没有但 data 字段有 items，使用 data 中的 items
+      if (!responseData.items && responseData.data && responseData.data.items) {
+        responseData = responseData.data;
+      }
+      
+      // 确保有 items 字段
+      if (responseData.items && Array.isArray(responseData.items)) {
+        records.value = responseData.items.map((item: any) => {
+          // 防止空记录
+          if (!item) {
+            console.error('Encountered null or undefined item in response');
+            return {
+              record_id: 0,
+              date: new Date().toISOString().split('T')[0],
+              type: 'raise',
+              status: 'pending',
+              photo_url: '',
+              points_awarded: 0,
+              user: { name: 'Unknown', student_id: '' }
+            };
+          }
+          
+          // 确保每条记录都有正确的字段
+          const processedItem = {
+            ...item,
+            // 修复可能的null值
+            record_id: item.record_id || 0,
+            date: item.date || new Date().toISOString().split('T')[0],
+            type: item.type || 'raise',
+            status: item.status || 'pending',
+            photo_url: item.photo_url || '',
+            points_awarded: item.points_awarded !== undefined ? item.points_awarded : 0,
+            user: item.user || { name: item.user_name || 'Unknown', student_id: item.student_id || '' }
+          };
+          
+          // 确保 photo_url 格式正确
+          if (processedItem.photo_url) {
+            processedItem.photo_url = getImageUrl(processedItem.photo_url);
+          }
+          
+          console.log('Processed record:', processedItem);
+          return processedItem;
+        });
+        
+        total.value = responseData.total || records.value.length;
+        console.log('Records loaded:', records.value.length);
+      } else {
+        console.error('No items array in response:', responseData);
+        ElMessage.error('获取记录失败：响应格式错误 - 缺少 items 数组');
+        records.value = [];
+        total.value = 0;
+      }
+    } else {
+      console.error('Invalid response format:', response);
+      ElMessage.error(response.msg || '获取记录失败：响应格式错误');
+      records.value = [];
+      total.value = 0;
     }
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.msg || '获取记录失败')
+    console.error('Error fetching records:', error);
+    console.error('Error details:', {
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    });
+    ElMessage.error(error.response?.data?.msg || '获取记录失败');
+    records.value = [];
+    total.value = 0;
   } finally {
     loading.value = false;
   }

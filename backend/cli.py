@@ -1,10 +1,9 @@
 import click
 from flask import Flask
 from flask.cli import with_appcontext
-from extensions import db
-from models import User, FlagRecord, Training, Event, PointHistory
+from db_connection import db
+from models_pymysql import User, FlagRecord, Training, Event, PointHistory, OperationLog
 from datetime import datetime, timedelta
-from sqlalchemy import text
 import logging
 import json
 import os
@@ -17,7 +16,6 @@ def create_app():
     """创建CLI专用的应用实例"""
     app = Flask(__name__)
     app.config.from_object(Config)
-    db.init_app(app)
     return app
 
 app = create_app()
@@ -27,7 +25,17 @@ app = create_app()
 def init_db():
     """初始化数据库"""
     try:
-        db.create_all()
+        # 读取并执行schema.sql
+        schema_path = os.path.join(os.path.dirname(__file__), 'sql', 'schema.sql')
+        with open(schema_path, 'r', encoding='utf-8') as f:
+            schema_sql = f.read()
+        
+        # 按分号分割SQL语句并执行
+        sql_statements = schema_sql.split(';')
+        for statement in sql_statements:
+            if statement.strip():
+                db.execute_update(statement)
+                
         click.echo('数据库表已创建')
     except Exception as e:
         click.echo(f'初始化数据库失败: {str(e)}')
@@ -40,14 +48,18 @@ def drop_db(yes):
     if yes or click.confirm('确定要删除所有数据库表吗？此操作不可恢复！'):
         try:
             # 针对MySQL，临时禁用外键检查
-            db.session.execute(text('SET FOREIGN_KEY_CHECKS=0;'))
-            db.session.commit()
-            db.drop_all()
-            db.session.execute(text('SET FOREIGN_KEY_CHECKS=1;'))
-            db.session.commit()
+            db.execute_update('SET FOREIGN_KEY_CHECKS=0;')
+            
+            # 获取所有表名
+            tables = db.execute_query("SHOW TABLES")
+            for table in tables:
+                table_name = list(table.values())[0]
+                db.execute_update(f"DROP TABLE IF EXISTS `{table_name}`")
+            
+            # 恢复外键检查
+            db.execute_update('SET FOREIGN_KEY_CHECKS=1;')
             click.echo('数据库表已删除')
         except Exception as e:
-            db.session.rollback()
             click.echo(f'删除数据库表失败: {str(e)}')
 
 @app.cli.command('create-user')
@@ -61,45 +73,34 @@ def drop_db(yes):
 def create_user(username, password, name, student_id, college, role):
     """创建用户"""
     try:
-        if User.query.filter_by(username=username).first():
+        # 检查用户名是否存在
+        if User.get_by_username(username):
             click.echo(f'用户名 {username} 已存在')
             return
-        if User.query.filter_by(student_id=student_id).first():
+            
+        # 检查学号是否存在
+        if User.get_by_student_id(student_id):
             click.echo(f'学号 {student_id} 已存在')
             return
             
-        user = User(
+        # 创建用户
+        user = User.create(
             username=username,
+            password=password,
+            role=role,
             name=name,
             student_id=student_id,
-            role=role,
             college=college
         )
         
-        # 设置密码并验证
-        if not user.set_password(password):
-            click.echo('设置密码失败')
-            return
-            
-        # 验证密码是否正确设置
-        if not user.check_password(password):
-            click.echo('密码验证失败')
-            return
-            
-        db.session.add(user)
-        db.session.commit()
-        
-        # 验证用户是否成功创建
-        created_user = User.query.filter_by(username=username).first()
-        if created_user and created_user.check_password(password):
+        if user:
             click.echo(f'用户 {username} 创建成功')
-            click.echo(f'用户ID: {created_user.user_id}')
-            click.echo(f'角色: {created_user.role}')
+            click.echo(f'用户ID: {user["user_id"]}')
+            click.echo(f'角色: {user["role"]}')
         else:
-            click.echo('用户创建后验证失败')
+            click.echo('用户创建失败')
             
     except Exception as e:
-        db.session.rollback()
         click.echo(f'创建用户失败: {str(e)}')
 
 @app.cli.command('delete-user')
@@ -108,15 +109,16 @@ def create_user(username, password, name, student_id, college, role):
 def delete_user(username):
     """删除用户"""
     try:
-        user = User.query.filter_by(username=username).first()
+        user = User.get_by_username(username)
         if user:
-            db.session.delete(user)
-            db.session.commit()
-            click.echo(f'用户 {username} 已删除')
+            result = User.delete(user['user_id'])
+            if result:
+                click.echo(f'用户 {username} 已删除')
+            else:
+                click.echo(f'删除用户 {username} 失败')
         else:
             click.echo(f'用户 {username} 不存在')
     except Exception as e:
-        db.session.rollback()
         click.echo(f'删除用户失败: {str(e)}')
 
 @app.cli.command('list-users')
@@ -125,18 +127,19 @@ def delete_user(username):
 def list_users(role):
     """列出所有用户"""
     try:
-        query = User.query
+        users = User.list_all()
+        
+        # 根据角色筛选
         if role:
-            query = query.filter_by(role=role)
-        users = query.all()
+            users = [user for user in users if user['role'] == role]
         
         if not users:
             click.echo('没有找到用户')
             return
             
         for user in users:
-            click.echo(f'ID: {user.user_id}, 用户名: {user.username}, 角色: {user.role}, '
-                      f'姓名: {user.name}, 学号: {user.student_id}, 学院: {user.college}')
+            click.echo(f'ID: {user["user_id"]}, 用户名: {user["username"]}, 角色: {user["role"]}, '
+                      f'姓名: {user["name"]}, 学号: {user["student_id"]}, 学院: {user["college"]}')
     except Exception as e:
         click.echo(f'列出用户失败: {str(e)}')
 
@@ -149,8 +152,15 @@ def cleanup_records(days, dry_run):
     cutoff_date = datetime.utcnow() - timedelta(days=days)
     try:
         # 统计要删除的记录
-        flag_count = FlagRecord.query.filter(FlagRecord.created_at < cutoff_date).count()
-        point_count = PointHistory.query.filter(PointHistory.change_time < cutoff_date).count()
+        flag_count = db.execute_query(
+            "SELECT COUNT(*) as count FROM flag_records WHERE created_at < %s",
+            (cutoff_date,), fetch_one=True
+        )['count']
+        
+        point_count = db.execute_query(
+            "SELECT COUNT(*) as count FROM point_history WHERE change_time < %s",
+            (cutoff_date,), fetch_one=True
+        )['count']
         
         if dry_run:
             click.echo(f'将要删除 {days} 天前的记录:')
@@ -159,15 +169,21 @@ def cleanup_records(days, dry_run):
             return
             
         # 清理旧的升降旗记录
-        FlagRecord.query.filter(FlagRecord.created_at < cutoff_date).delete()
+        db.execute_update(
+            "DELETE FROM flag_records WHERE created_at < %s",
+            (cutoff_date,)
+        )
+        
         # 清理旧的积分历史
-        PointHistory.query.filter(PointHistory.change_time < cutoff_date).delete()
-        db.session.commit()
+        db.execute_update(
+            "DELETE FROM point_history WHERE change_time < %s",
+            (cutoff_date,)
+        )
+        
         click.echo(f'已清理 {days} 天前的记录:')
         click.echo(f'- 升降旗记录: {flag_count} 条')
         click.echo(f'- 积分历史: {point_count} 条')
     except Exception as e:
-        db.session.rollback()
         click.echo(f'清理记录失败: {str(e)}')
 
 @app.cli.command('backup-db')
@@ -180,58 +196,60 @@ def backup_db(backup_path):
         os.makedirs(os.path.dirname(backup_path), exist_ok=True)
         
         # 获取数据库连接信息
-        db_url = app.config['SQLALCHEMY_DATABASE_URI']
-        if db_url.startswith('mysql'):
-            # 从连接字符串中提取数据库信息
-            from urllib.parse import urlparse
-            parsed = urlparse(db_url)
-            db_name = parsed.path[1:]  # 去掉开头的斜杠
-            user = parsed.username
-            password = parsed.password
-            host = parsed.hostname
-            
-            # 使用 mysqldump 命令备份
-            import subprocess
-            cmd = f'mysqldump -h {host} -u {user} -p{password} {db_name} > {backup_path}'
-            subprocess.run(cmd, shell=True, check=True)
-            click.echo(f'MySQL数据库已备份到 {backup_path}')
-        else:
-            click.echo('目前只支持 MySQL 数据库的备份')
+        host = app.config['MYSQL_HOST']
+        user = app.config['MYSQL_USER']
+        password = app.config['MYSQL_PASSWORD']
+        db_name = app.config['MYSQL_DATABASE']
+        
+        # 使用 mysqldump 命令备份
+        import subprocess
+        cmd = f'mysqldump -h {host} -u {user} -p{password} {db_name} > {backup_path}'
+        subprocess.run(cmd, shell=True, check=True)
+        click.echo(f'MySQL数据库已备份到 {backup_path}')
     except Exception as e:
-        click.echo(f'备份数据库失败: {str(e)}')
+        click.echo(f'数据库备份失败: {str(e)}')
 
 @app.cli.command('check-system')
 @with_appcontext
 def check_system():
-    """检查系统状态"""
+    """系统健康检查"""
     try:
         # 检查数据库连接
-        db.session.execute(text('SELECT 1'))
-        click.echo('数据库连接正常')
+        try:
+            db.get_connection()
+            click.echo('✅ 数据库连接正常')
+        except Exception as e:
+            click.echo(f'❌ 数据库连接失败: {str(e)}')
+            return
+            
+        # 检查表是否存在
+        tables = ['users', 'trainings', 'training_registrations', 'events', 
+                  'event_registrations', 'flag_records', 'point_history', 'operation_logs']
+        missing_tables = []
         
-        # 检查用户数量
-        user_count = User.query.count()
-        click.echo(f'系统中共有 {user_count} 个用户')
+        for table in tables:
+            result = db.execute_query(
+                f"SHOW TABLES LIKE '{table}'"
+            )
+            if not result:
+                missing_tables.append(table)
+                
+        if missing_tables:
+            click.echo(f'❌ 缺少以下数据表: {", ".join(missing_tables)}')
+        else:
+            click.echo('✅ 所有数据表存在')
+            
+        # 显示统计信息
+        user_count = db.execute_query("SELECT COUNT(*) as count FROM users", fetch_one=True)['count']
+        training_count = db.execute_query("SELECT COUNT(*) as count FROM trainings", fetch_one=True)['count']
+        event_count = db.execute_query("SELECT COUNT(*) as count FROM events", fetch_one=True)['count']
+        flag_count = db.execute_query("SELECT COUNT(*) as count FROM flag_records", fetch_one=True)['count']
         
-        # 检查管理员数量
-        admin_count = User.query.filter_by(role='admin').count()
-        click.echo(f'系统中共有 {admin_count} 个管理员')
-        
-        # 检查活动和训练数量
-        event_count = Event.query.count()
-        click.echo(f'系统中共有 {event_count} 个活动')
-        training_count = Training.query.count()
-        click.echo(f'系统中共有 {training_count} 个训练')
-        
-        # 检查最近的记录
-        recent_flags = FlagRecord.query.order_by(FlagRecord.created_at.desc()).limit(5).all()
-        click.echo('最近的升降旗记录:')
-        for flag in recent_flags:
-            click.echo(f'- {flag.date}: {flag.type} ({flag.status})')
-        
-        # 检查积分统计
-        total_points = db.session.query(db.func.sum(User.total_points)).scalar() or 0
-        click.echo(f'系统总积分: {total_points}')
+        click.echo('\n系统统计信息:')
+        click.echo(f'- 用户数量: {user_count}')
+        click.echo(f'- 训练数量: {training_count}')
+        click.echo(f'- 活动数量: {event_count}')
+        click.echo(f'- 升降旗记录: {flag_count}')
         
     except Exception as e:
         click.echo(f'系统检查失败: {str(e)}')
@@ -243,15 +261,17 @@ def check_system():
 def reset_password(username, new_password):
     """重置用户密码"""
     try:
-        user = User.query.filter_by(username=username).first()
-        if user:
-            user.set_password(new_password)
-            db.session.commit()
-            click.echo(f'用户 {username} 的密码已重置')
-        else:
+        user = User.get_by_username(username)
+        if not user:
             click.echo(f'用户 {username} 不存在')
+            return
+            
+        if User.set_password(user['user_id'], new_password):
+            click.echo(f'用户 {username} 密码已重置')
+        else:
+            click.echo(f'重置 {username} 密码失败')
+            
     except Exception as e:
-        db.session.rollback()
         click.echo(f'重置密码失败: {str(e)}')
 
 @app.cli.command('export-data')
@@ -259,32 +279,40 @@ def reset_password(username, new_password):
 @click.option('--format', type=click.Choice(['json', 'csv']), default='json', help='导出格式')
 @with_appcontext
 def export_data(export_path, format):
-    """导出系统数据"""
+    """导出数据"""
     try:
-        data = {
-            'users': [user.to_dict() for user in User.query.all()],
-            'flag_records': [record.to_dict() for record in FlagRecord.query.all()],
-            'trainings': [training.to_dict() for training in Training.query.all()],
-            'events': [event.to_dict() for event in Event.query.all()],
-            'point_history': [history.to_dict() for history in PointHistory.query.all()]
-        }
-        
+        # 确保导出目录存在
         os.makedirs(os.path.dirname(export_path), exist_ok=True)
+        
+        # 获取要导出的数据
+        users = User.list_all()
+        trainings = Training.list_all()
+        events = Event.list_all()
+        flag_records = FlagRecord.list_all()
+        point_history = PointHistory.list_all()
+        
+        # 准备导出数据
+        export_data = {
+            'users': users,
+            'trainings': trainings,
+            'events': events,
+            'flag_records': flag_records,
+            'point_history': point_history,
+            'export_time': datetime.utcnow().isoformat()
+        }
         
         if format == 'json':
             with open(export_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=4)
-            click.echo(f'数据已导出到 {export_path} (JSON格式)')
+                json.dump(export_data, f, ensure_ascii=False, indent=2, default=str)
+            click.echo(f'数据已导出为JSON格式: {export_path}')
         else:
-            # TODO: 实现 CSV 导出
-            click.echo('CSV 导出功能尚未实现')
-            return
+            click.echo('CSV导出格式暂不支持')
             
     except Exception as e:
         click.echo(f'导出数据失败: {str(e)}')
 
 def init_cli(app):
-    """注册CLI命令"""
+    """初始化CLI命令"""
     app.cli.add_command(init_db)
     app.cli.add_command(drop_db)
     app.cli.add_command(create_user)

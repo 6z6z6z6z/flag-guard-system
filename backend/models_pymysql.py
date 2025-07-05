@@ -173,18 +173,23 @@ class User(BaseModel):
         if not user:
             return {}
         
+        # 确保处理可能缺失的字段
+        height = user.get('height')
+        weight = user.get('weight')
+        shoe_size = user.get('shoe_size')
+        
         return {
-            'user_id': user['user_id'],
-            'username': user['username'],
-            'role': user['role'],
-            'name': user['name'],
-            'student_id': user['student_id'],
-            'college': user['college'],
-            'height': user['height'],
-            'weight': user['weight'],
-            'shoe_size': user['shoe_size'],
-            'total_points': user['total_points'],
-            'phone_number': user['phone_number']
+            'user_id': user.get('user_id'),
+            'username': user.get('username'),
+            'role': user.get('role'),
+            'name': user.get('name'),
+            'student_id': user.get('student_id'),
+            'college': user.get('college'),
+            'height': height if height is not None else '',
+            'weight': weight if weight is not None else '',
+            'shoe_size': shoe_size if shoe_size is not None else '',
+            'total_points': user.get('total_points', 0),
+            'phone_number': user.get('phone_number', '')
         }
 
 class Training(BaseModel):
@@ -256,26 +261,28 @@ class Training(BaseModel):
     def update_status(cls, training_id, status):
         """更新训练状态"""
         try:
-            db.execute_update(TRAINING_QUERIES['update_status'], (status, training_id))
-            return cls.get_by_id(training_id)
+            return db.execute_update(TRAINING_QUERIES['update_status'], (status, training_id))
         except Exception as e:
             logger.error(f"更新训练状态失败: {str(e)}")
-            return None
-    
+            return 0
+            
     @classmethod
     def to_dict(cls, training):
-        """训练对象转字典"""
+        """将训练转换为字典"""
         if not training:
             return {}
-            
-        return cls.format_dict(training)
+        
+        # 处理日期时间格式
+        result = cls.format_dict(training)
+        
+        return result
 
 class TrainingRegistration(BaseModel):
     """训练报名模型"""
     
     @classmethod
     def create(cls, training_id, user_id, status='registered'):
-        """创建训练报名记录"""
+        """创建训练报名"""
         try:
             registration_id = db.execute_insert(
                 TRAINING_REGISTRATION_QUERIES['create'],
@@ -283,33 +290,33 @@ class TrainingRegistration(BaseModel):
             )
             return cls.get_by_id(registration_id)
         except Exception as e:
-            logger.error(f"创建训练报名记录失败: {str(e)}")
+            logger.error(f"创建训练报名失败: {str(e)}")
             return None
     
     @classmethod
     def get_by_id(cls, registration_id):
-        """根据ID获取训练报名记录"""
+        """根据ID获取报名信息"""
         try:
             return db.execute_query(
-                TRAINING_REGISTRATION_QUERIES['get_by_id'],
-                (registration_id,),
+                TRAINING_REGISTRATION_QUERIES['get_by_id'], 
+                (registration_id,), 
                 fetch_one=True
             )
         except Exception as e:
-            logger.error(f"获取训练报名记录失败: {str(e)}")
+            logger.error(f"获取报名信息失败: {str(e)}")
             return None
     
     @classmethod
     def get_by_training_and_user(cls, training_id, user_id):
-        """根据训练ID和用户ID获取报名记录"""
+        """根据训练和用户获取报名信息"""
         try:
             return db.execute_query(
-                TRAINING_REGISTRATION_QUERIES['get_by_training_and_user'],
-                (training_id, user_id),
+                TRAINING_REGISTRATION_QUERIES['get_by_training_and_user'], 
+                (training_id, user_id), 
                 fetch_one=True
             )
         except Exception as e:
-            logger.error(f"获取训练报名记录失败: {str(e)}")
+            logger.error(f"获取报名信息失败: {str(e)}")
             return None
     
     @classmethod
@@ -327,16 +334,15 @@ class TrainingRegistration(BaseModel):
     
     @classmethod
     def award_points(cls, registration_id, points):
-        """给予积分"""
+        """奖励积分"""
         try:
-            db.execute_update(
+            return db.execute_update(
                 TRAINING_REGISTRATION_QUERIES['award_points'],
                 (points, registration_id)
             )
-            return cls.get_by_id(registration_id)
         except Exception as e:
-            logger.error(f"给予积分失败: {str(e)}")
-            return None
+            logger.error(f"奖励积分失败: {str(e)}")
+            return 0
     
     @classmethod
     def delete(cls, registration_id):
@@ -349,7 +355,7 @@ class TrainingRegistration(BaseModel):
     
     @classmethod
     def list_by_training(cls, training_id):
-        """列出某个训练的所有报名记录"""
+        """列出训练的所有报名记录"""
         try:
             return db.execute_query(TRAINING_REGISTRATION_QUERIES['list_by_training'], (training_id,))
         except Exception as e:
@@ -358,7 +364,7 @@ class TrainingRegistration(BaseModel):
     
     @classmethod
     def list_by_user(cls, user_id):
-        """列出某个用户的所有报名记录"""
+        """列出用户的所有报名记录"""
         try:
             return db.execute_query(TRAINING_REGISTRATION_QUERIES['list_by_user'], (user_id,))
         except Exception as e:
@@ -367,10 +373,11 @@ class TrainingRegistration(BaseModel):
     
     @classmethod
     def to_dict(cls, registration):
-        """报名记录转字典"""
+        """将报名记录转换为字典"""
         if not registration:
             return {}
-            
+        
+        # 处理日期时间格式
         return cls.format_dict(registration)
 
 class Event(BaseModel):
@@ -395,7 +402,7 @@ class Event(BaseModel):
         try:
             event = db.execute_query(EVENT_QUERIES['get_by_id'], (event_id,), fetch_one=True)
             if event:
-                # 获取关联的训练
+                # 获取活动关联的训练
                 trainings = EventTraining.list_by_event(event_id)
                 event['trainings'] = trainings
             return event
@@ -430,9 +437,9 @@ class Event(BaseModel):
         """列出所有活动"""
         try:
             events = db.execute_query(EVENT_QUERIES['list_all'])
-            # 为每个活动添加状态
+            # 为每个活动获取关联的训练
             for event in events:
-                event['status'] = cls.status(event)
+                event['trainings'] = EventTraining.list_by_event(event['event_id'])
             return events
         except Exception as e:
             logger.error(f"获取活动列表失败: {str(e)}")
@@ -443,9 +450,9 @@ class Event(BaseModel):
         """列出即将开始的活动"""
         try:
             events = db.execute_query(EVENT_QUERIES['list_upcoming'])
-            # 为每个活动添加状态
+            # 为每个活动获取关联的训练
             for event in events:
-                event['status'] = cls.status(event)
+                event['trainings'] = EventTraining.list_by_event(event['event_id'])
             return events
         except Exception as e:
             logger.error(f"获取即将开始的活动失败: {str(e)}")
@@ -454,30 +461,30 @@ class Event(BaseModel):
     @classmethod
     def status(cls, event):
         """获取活动状态"""
-        try:
-            if not event or not event.get('time'):
-                return '未知'
-                
-            event_time = event['time']
-            if isinstance(event_time, str):
-                event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
-                
-            if event_time > datetime.now():
-                return '未开始'
-            else:
-                return '已结束'
-        except Exception as e:
-            logger.error(f"获取活动状态失败: {str(e)}")
+        if not event:
             return '未知'
+        
+        event_time = event.get('time')
+        if not event_time:
+            return '未知'
+            
+        if isinstance(event_time, str):
+            event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
+            
+        return '未开始' if event_time > datetime.now() else '已结束'
     
     @classmethod
     def to_dict(cls, event):
-        """活动对象转字典"""
+        """将活动转换为字典"""
         if not event:
             return {}
-            
+        
+        # 处理日期时间格式
         result = cls.format_dict(event)
+        
+        # 添加状态
         result['status'] = cls.status(event)
+        
         return result
 
 class EventTraining(BaseModel):
@@ -485,7 +492,7 @@ class EventTraining(BaseModel):
     
     @classmethod
     def add(cls, event_id, training_id):
-        """添加活动-训练关联"""
+        """添加关联"""
         try:
             return db.execute_insert(EVENT_TRAINING_QUERIES['add'], (event_id, training_id))
         except Exception as e:
@@ -494,11 +501,11 @@ class EventTraining(BaseModel):
     
     @classmethod
     def remove(cls, event_id, training_id):
-        """删除活动-训练关联"""
+        """移除关联"""
         try:
             return db.execute_update(EVENT_TRAINING_QUERIES['remove'], (event_id, training_id))
         except Exception as e:
-            logger.error(f"删除活动-训练关联失败: {str(e)}")
+            logger.error(f"移除活动-训练关联失败: {str(e)}")
             return 0
     
     @classmethod
@@ -507,7 +514,7 @@ class EventTraining(BaseModel):
         try:
             return db.execute_query(EVENT_TRAINING_QUERIES['list_by_event'], (event_id,))
         except Exception as e:
-            logger.error(f"获取活动关联的训练失败: {str(e)}")
+            logger.error(f"获取活动关联训练列表失败: {str(e)}")
             return []
     
     @classmethod
@@ -516,7 +523,7 @@ class EventTraining(BaseModel):
         try:
             return db.execute_query(EVENT_TRAINING_QUERIES['list_by_training'], (training_id,))
         except Exception as e:
-            logger.error(f"获取训练关联的活动失败: {str(e)}")
+            logger.error(f"获取训练关联活动列表失败: {str(e)}")
             return []
 
 class EventRegistration(BaseModel):
@@ -524,7 +531,7 @@ class EventRegistration(BaseModel):
     
     @classmethod
     def create(cls, event_id, user_id, status='registered'):
-        """创建活动报名记录"""
+        """创建活动报名"""
         try:
             registration_id = db.execute_insert(
                 EVENT_REGISTRATION_QUERIES['create'],
@@ -532,43 +539,40 @@ class EventRegistration(BaseModel):
             )
             return cls.get_by_id(registration_id)
         except Exception as e:
-            logger.error(f"创建活动报名记录失败: {str(e)}")
+            logger.error(f"创建活动报名失败: {str(e)}")
             return None
     
     @classmethod
     def get_by_id(cls, registration_id):
-        """根据ID获取活动报名记录"""
+        """根据ID获取报名信息"""
         try:
             return db.execute_query(
-                EVENT_REGISTRATION_QUERIES['get_by_id'],
-                (registration_id,),
+                EVENT_REGISTRATION_QUERIES['get_by_id'], 
+                (registration_id,), 
                 fetch_one=True
             )
         except Exception as e:
-            logger.error(f"获取活动报名记录失败: {str(e)}")
+            logger.error(f"获取报名信息失败: {str(e)}")
             return None
     
     @classmethod
     def get_by_event_and_user(cls, event_id, user_id):
-        """根据活动ID和用户ID获取报名记录"""
+        """根据活动和用户获取报名信息"""
         try:
             return db.execute_query(
-                EVENT_REGISTRATION_QUERIES['get_by_event_and_user'],
-                (event_id, user_id),
+                EVENT_REGISTRATION_QUERIES['get_by_event_and_user'], 
+                (event_id, user_id), 
                 fetch_one=True
             )
         except Exception as e:
-            logger.error(f"获取活动报名记录失败: {str(e)}")
+            logger.error(f"获取报名信息失败: {str(e)}")
             return None
     
     @classmethod
     def update_status(cls, registration_id, status):
         """更新报名状态"""
         try:
-            db.execute_update(
-                EVENT_REGISTRATION_QUERIES['update_status'],
-                (status, registration_id)
-            )
+            db.execute_update(EVENT_REGISTRATION_QUERIES['update_status'], (status, registration_id))
             return cls.get_by_id(registration_id)
         except Exception as e:
             logger.error(f"更新报名状态失败: {str(e)}")
@@ -585,20 +589,47 @@ class EventRegistration(BaseModel):
     
     @classmethod
     def list_by_event(cls, event_id):
-        """列出某个活动的所有报名记录"""
+        """列出活动的所有报名记录"""
         try:
-            return db.execute_query(EVENT_REGISTRATION_QUERIES['list_by_event'], (event_id,))
+            # 打印执行的SQL语句和参数，用于调试
+            logger.info(f"执行SQL: {EVENT_REGISTRATION_QUERIES['list_by_event']} 参数: {event_id}")
+            
+            results = db.execute_query(EVENT_REGISTRATION_QUERIES['list_by_event'], (event_id,))
+            
+            # 打印原始结果用于调试
+            logger.info(f"查询原始结果数量: {len(results)}")
+            if results and len(results) > 0:
+                logger.info(f"第一条记录示例: {results[0]}")
+            
+            # 确保结果被正确格式化，处理潜在的None值
+            formatted_results = []
+            for row in results:
+                # 转换datetime对象为字符串
+                formatted_row = cls.format_dict(row)
+                # 确保身高、体重和鞋码字段显示，即使为NULL也要转换为可显示的值
+                if formatted_row.get('height') is None:
+                    formatted_row['height'] = ''
+                if formatted_row.get('weight') is None:
+                    formatted_row['weight'] = ''
+                if formatted_row.get('shoe_size') is None:
+                    formatted_row['shoe_size'] = ''
+                    
+                logger.debug(f"格式化后记录: height={formatted_row.get('height')}, weight={formatted_row.get('weight')}, shoe_size={formatted_row.get('shoe_size')}")
+                formatted_results.append(formatted_row)
+            
+            logger.info(f"成功获取活动 {event_id} 的报名列表: {len(formatted_results)} 条记录")
+            return formatted_results
         except Exception as e:
             logger.error(f"获取活动报名列表失败: {str(e)}")
             return []
     
     @classmethod
     def list_by_user(cls, user_id):
-        """列出某个用户的所有活动报名记录"""
+        """列出用户的所有报名记录"""
         try:
             return db.execute_query(EVENT_REGISTRATION_QUERIES['list_by_user'], (user_id,))
         except Exception as e:
-            logger.error(f"获取用户活动报名列表失败: {str(e)}")
+            logger.error(f"获取用户报名列表失败: {str(e)}")
             return []
 
 class FlagRecord(BaseModel):
@@ -608,22 +639,41 @@ class FlagRecord(BaseModel):
     def create(cls, user_id, date, type, photo_url, status='pending'):
         """创建升降旗记录"""
         try:
+            logger.info(f"创建升降旗记录: user_id={user_id}, date={date}, type={type}, photo_url={photo_url}, status={status}")
+            
+            # 转换日期格式
+            if isinstance(date, str):
+                try:
+                    date = datetime.strptime(date, '%Y-%m-%d').date()
+                except ValueError as e:
+                    logger.error(f"日期格式错误: {str(e)}")
+                    # 使用当前日期作为默认值
+                    date = datetime.now().date()
+            
             record_id = db.execute_insert(
                 FLAG_RECORD_QUERIES['create'],
                 (user_id, date, type, photo_url, status)
             )
+            
+            logger.info(f"升降旗记录创建成功，ID: {record_id}")
             return cls.get_by_id(record_id)
         except Exception as e:
             logger.error(f"创建升降旗记录失败: {str(e)}")
+            logger.exception(e)
             return None
     
     @classmethod
     def get_by_id(cls, record_id):
         """根据ID获取升降旗记录"""
         try:
-            return db.execute_query(FLAG_RECORD_QUERIES['get_by_id'], (record_id,), fetch_one=True)
+            result = db.execute_query(FLAG_RECORD_QUERIES['get_by_id'], (record_id,), fetch_one=True)
+            if result:
+                # 转换datetime对象为字符串
+                return cls.format_dict(result)
+            return None
         except Exception as e:
             logger.error(f"获取升降旗记录失败: {str(e)}")
+            logger.exception(e)
             return None
     
     @classmethod
@@ -643,6 +693,7 @@ class FlagRecord(BaseModel):
     def review(cls, record_id, status, points_awarded, reviewer_id):
         """审核升降旗记录"""
         try:
+            logger.info(f"审核升降旗记录: record_id={record_id}, status={status}, points_awarded={points_awarded}, reviewer_id={reviewer_id}")
             db.execute_update(
                 FLAG_RECORD_QUERIES['review'],
                 (status, points_awarded, reviewer_id, record_id)
@@ -650,6 +701,7 @@ class FlagRecord(BaseModel):
             return cls.get_by_id(record_id)
         except Exception as e:
             logger.error(f"审核升降旗记录失败: {str(e)}")
+            logger.exception(e)
             return None
     
     @classmethod
@@ -665,27 +717,100 @@ class FlagRecord(BaseModel):
     def list_by_user(cls, user_id):
         """列出用户的所有升降旗记录"""
         try:
-            return db.execute_query(FLAG_RECORD_QUERIES['list_by_user'], (user_id,))
+            logger.info(f"获取用户 {user_id} 的升降旗记录")
+            results = db.execute_query(FLAG_RECORD_QUERIES['list_by_user'], (user_id,))
+            
+            # 确保结果被正确格式化，处理潜在的None值
+            formatted_results = []
+            for row in results:
+                if row is None:
+                    logger.warning("遇到None记录，已跳过")
+                    continue
+                    
+                # 转换datetime对象为字符串
+                formatted_row = cls.format_dict(row)
+                
+                # 确保所有必需的字段都存在
+                if 'record_id' not in formatted_row or formatted_row['record_id'] is None:
+                    logger.warning(f"记录缺少record_id: {formatted_row}")
+                    continue
+                
+                if 'status' not in formatted_row or formatted_row['status'] is None:
+                    formatted_row['status'] = 'pending'
+                
+                if 'points_awarded' not in formatted_row or formatted_row['points_awarded'] is None:
+                    formatted_row['points_awarded'] = 0
+                
+                formatted_results.append(formatted_row)
+            
+            logger.info(f"成功获取用户 {user_id} 的升降旗记录: {len(formatted_results)} 条记录")
+            return formatted_results
         except Exception as e:
-            logger.error(f"获取用户升降旗记录列表失败: {str(e)}")
+            logger.error(f"获取用户升降旗记录失败: {str(e)}")
+            logger.exception(e)
             return []
     
     @classmethod
     def list_all(cls):
         """列出所有升降旗记录"""
         try:
-            return db.execute_query(FLAG_RECORD_QUERIES['list_all'])
+            logger.info("获取所有升降旗记录")
+            results = db.execute_query(FLAG_RECORD_QUERIES['list_all'])
+            
+            # 确保结果被正确格式化，处理潜在的None值
+            formatted_results = []
+            for row in results:
+                if row is None:
+                    logger.warning("遇到None记录，已跳过")
+                    continue
+                    
+                # 转换datetime对象为字符串
+                formatted_row = cls.format_dict(row)
+                
+                # 确保所有必需的字段都存在
+                if 'record_id' not in formatted_row or formatted_row['record_id'] is None:
+                    logger.warning(f"记录缺少record_id: {formatted_row}")
+                    continue
+                
+                if 'status' not in formatted_row or formatted_row['status'] is None:
+                    formatted_row['status'] = 'pending'
+                
+                if 'points_awarded' not in formatted_row or formatted_row['points_awarded'] is None:
+                    formatted_row['points_awarded'] = 0
+                
+                # 构建统一的用户对象格式
+                formatted_row['user'] = {
+                    'name': formatted_row.get('user_name', 'Unknown'),
+                    'student_id': formatted_row.get('student_id', '')
+                }
+                
+                formatted_results.append(formatted_row)
+            
+            logger.info(f"成功获取所有升降旗记录: {len(formatted_results)} 条记录")
+            return formatted_results
         except Exception as e:
             logger.error(f"获取所有升降旗记录失败: {str(e)}")
+            logger.exception(e)
             return []
     
     @classmethod
     def list_pending(cls):
         """列出所有待审核的升降旗记录"""
         try:
-            return db.execute_query(FLAG_RECORD_QUERIES['list_pending'])
+            results = db.execute_query(FLAG_RECORD_QUERIES['list_pending'])
+            
+            # 确保结果被正确格式化，处理潜在的None值
+            formatted_results = []
+            for row in results:
+                # 转换datetime对象为字符串
+                formatted_row = cls.format_dict(row)
+                formatted_results.append(formatted_row)
+            
+            logger.info(f"成功获取待审核升降旗记录: {len(formatted_results)} 条记录")
+            return formatted_results
         except Exception as e:
             logger.error(f"获取待审核升降旗记录失败: {str(e)}")
+            logger.exception(e)
             return []
 
 class PointHistory(BaseModel):
@@ -709,8 +834,8 @@ class PointHistory(BaseModel):
         """根据ID获取积分历史记录"""
         try:
             return db.execute_query(
-                POINT_HISTORY_QUERIES['get_by_id'],
-                (history_id,),
+                POINT_HISTORY_QUERIES['get_by_id'], 
+                (history_id,), 
                 fetch_one=True
             )
         except Exception as e:
@@ -719,7 +844,7 @@ class PointHistory(BaseModel):
     
     @classmethod
     def list_by_user(cls, user_id):
-        """获取用户的积分历史记录"""
+        """列出用户的所有积分历史记录"""
         try:
             return db.execute_query(POINT_HISTORY_QUERIES['list_by_user'], (user_id,))
         except Exception as e:
@@ -728,21 +853,23 @@ class PointHistory(BaseModel):
     
     @classmethod
     def list_all(cls):
-        """获取所有积分历史记录"""
+        """列出所有积分历史记录"""
         try:
             return db.execute_query(POINT_HISTORY_QUERIES['list_all'])
         except Exception as e:
             logger.error(f"获取所有积分历史记录失败: {str(e)}")
             return []
-            
+    
     @classmethod
     def get_user_total(cls, user_id):
         """获取用户总积分"""
         try:
-            result = db.execute_query(POINT_HISTORY_QUERIES['get_user_total'], (user_id,), fetch_one=True)
-            if result and 'total_points' in result:
-                return float(result['total_points'] or 0)
-            return 0
+            result = db.execute_query(
+                POINT_HISTORY_QUERIES['get_user_total'], 
+                (user_id,), 
+                fetch_one=True
+            )
+            return result['total_points'] if result and result['total_points'] else 0
         except Exception as e:
             logger.error(f"获取用户总积分失败: {str(e)}")
             return 0
@@ -754,20 +881,19 @@ class OperationLog(BaseModel):
     def create(cls, user_id, endpoint, method, ip_address):
         """创建操作日志"""
         try:
-            log_id = db.execute_insert(
+            return db.execute_insert(
                 OPERATION_LOG_QUERIES['create'],
                 (user_id, endpoint, method, ip_address)
             )
-            return log_id
         except Exception as e:
             logger.error(f"创建操作日志失败: {str(e)}")
             return None
     
     @classmethod
     def list_recent(cls, limit=100):
-        """获取最近的操作日志"""
+        """列出最近的操作日志"""
         try:
             return db.execute_query(OPERATION_LOG_QUERIES['list_recent'], (limit,))
         except Exception as e:
-            logger.error(f"获取操作日志失败: {str(e)}")
-            return []
+            logger.error(f"获取最近操作日志失败: {str(e)}")
+            return [] 

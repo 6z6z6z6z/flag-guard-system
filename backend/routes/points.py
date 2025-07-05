@@ -1,7 +1,7 @@
 from flask import Blueprint, request, current_app
 from datetime import datetime, timedelta
-from sqlalchemy import func, and_
-from models import User, PointHistory, db
+from models_pymysql import User, PointHistory
+from db_connection import db
 from utils.route_utils import (
     APIResponse, validate_required_fields, handle_exceptions,
     validate_json_request, role_required
@@ -39,7 +39,7 @@ def get_point_history():
     """
     try:
         current_app.logger.info("Starting get_point_history")
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         current_app.logger.info(f"User ID from JWT: {user_id}")
         
         page = request.args.get('page', 1, type=int)
@@ -48,46 +48,56 @@ def get_point_history():
         
         current_app.logger.info(f"Query params - page: {page}, per_page: {per_page}, type: {type_filter}")
         
-        # 构建基础查询
-        query = PointHistory.query.filter_by(user_id=user_id)
+        # 获取积分历史
+        history_list = PointHistory.list_by_user(user_id)
+        current_app.logger.info(f"Retrieved {len(history_list)} history records")
+        
+        # 按类型过滤
         if type_filter:
-            query = query.filter_by(change_type=type_filter)
+            history_list = [h for h in history_list if h.get('change_type') == type_filter]
+            current_app.logger.info(f"Filtered by type: {len(history_list)} records match")
         
-        # 添加排序
-        query = query.order_by(PointHistory.change_time.desc())
+        # 按时间降序排序
+        history_list.sort(
+            key=lambda x: x.get('change_time') if isinstance(x.get('change_time'), datetime) 
+            else datetime.fromisoformat(x.get('change_time').replace('Z', '+00:00')), 
+            reverse=True
+        )
         
-        # 执行分页查询
-        current_app.logger.info("Executing pagination query")
-        pagination = query.paginate(page=page, per_page=per_page)
+        # 手动分页
+        total = len(history_list)
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+        start_idx = (page - 1) * per_page
+        end_idx = min(start_idx + per_page, total)
         
-        # 获取记录并转换为字典
+        # 获取当前页的记录
+        current_page_items = history_list[start_idx:end_idx] if start_idx < total else []
+        
+        # 确保points_change是浮点数
         items = []
-        for item in pagination.items:
+        for item in current_page_items:
             try:
-                item_dict = item.to_dict()
-                current_app.logger.info(f"History item: {item_dict}")
-                # 确保points_change是浮点数
-                if 'points_change' in item_dict:
-                    item_dict['points_change'] = float(item_dict['points_change'])
-                items.append(item_dict)
+                if 'points_change' in item:
+                    item['points_change'] = float(item['points_change'])
+                items.append(item)
             except Exception as e:
-                current_app.logger.error(f"Error converting history item to dict: {str(e)}", exc_info=True)
+                current_app.logger.error(f"Error converting history item: {str(e)}", exc_info=True)
         
-        current_app.logger.info(f"Found {len(items)} history records")
+        current_app.logger.info(f"Final items count: {len(items)}")
         
         # 获取用户信息
-        user = User.query.get(user_id)
-        current_app.logger.info(f"User total points: {user.total_points if user else 'User not found'}")
+        user = User.get_by_id(user_id)
+        current_app.logger.info(f"User total points: {user.get('total_points') if user else 'User not found'}")
         
         response_data = {
             'items': items,
-            'total': pagination.total,
-            'pages': pagination.pages,
+            'total': total,
+            'pages': total_pages,
             'current_page': page,
-            'total_points': float(user.total_points) if user else 0.0
+            'total_points': float(user.get('total_points', 0)) if user else 0.0
         }
         
-        current_app.logger.info(f"Response data: {response_data}")
+        current_app.logger.info(f"Response data prepared")
         
         return APIResponse.success(data=response_data)
     except Exception as e:
@@ -137,34 +147,56 @@ def get_all_point_history():
         
         current_app.logger.info(f"Query params - page: {page}, per_page: {per_page}, type: {type_filter}, query: {search_query}")
         
-        query = PointHistory.query.join(User)
+        # 获取所有历史记录
+        all_history = PointHistory.list_all()
+        
+        # 按类型过滤
         if type_filter:
-            query = query.filter(PointHistory.change_type == type_filter)
+            all_history = [h for h in all_history if h.get('change_type') == type_filter]
         
+        # 如果有搜索关键词，过滤结果
+        filtered_history = []
         if search_query:
-            query = query.filter(
-                (User.username.ilike(f'%{search_query}%')) |
-                (User.name.ilike(f'%{search_query}%')) |
-                (User.student_id.ilike(f'%{search_query}%'))
-            )
-            
-        query = query.order_by(PointHistory.change_time.desc())
+            search_query = search_query.lower()
+            for history in all_history:
+                user_id = history.get('user_id')
+                user = User.get_by_id(user_id) if user_id else None
+                if user:
+                    if (search_query in str(user.get('username', '')).lower() or
+                        search_query in str(user.get('name', '')).lower() or
+                        search_query in str(user.get('student_id', '')).lower()):
+                        history['user'] = user
+                        filtered_history.append(history)
+        else:
+            # 添加用户信息到每条记录
+            for history in all_history:
+                user_id = history.get('user_id')
+                user = User.get_by_id(user_id) if user_id else None
+                history['user'] = user or {}
+                filtered_history.append(history)
         
-        current_app.logger.info("Executing pagination query")
-        pagination = query.paginate(page=page, per_page=per_page)
+        # 按时间降序排序
+        filtered_history.sort(
+            key=lambda x: x.get('change_time') if isinstance(x.get('change_time'), datetime) 
+            else datetime.fromisoformat(x.get('change_time').replace('Z', '+00:00')),
+            reverse=True
+        )
         
-        items = []
-        for history in pagination.items:
-            history_dict = history.to_dict()
-            history_dict['user'] = history.user.to_dict()
-            items.append(history_dict)
+        # 手动分页
+        total = len(filtered_history)
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+        start_idx = (page - 1) * per_page
+        end_idx = min(start_idx + per_page, total)
+        
+        # 获取当前页的记录
+        items = filtered_history[start_idx:end_idx] if start_idx < total else []
             
-        current_app.logger.info(f"Found {len(items)} history records")
+        current_app.logger.info(f"Found {len(items)} history records for current page")
         
         return APIResponse.success(data={
             'items': items,
-            'total': pagination.total,
-            'pages': pagination.pages,
+            'total': total,
+            'pages': total_pages,
             'current_page': page
         })
     except Exception as e:
@@ -189,56 +221,63 @@ def get_point_statistics():
     """
     try:
         current_app.logger.info("Starting get_point_statistics")
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         current_app.logger.info(f"User ID from JWT: {user_id}")
         
-        user = User.query.get(user_id)
+        user = User.get_by_id(user_id)
         if not user:
             current_app.logger.error(f"User not found for ID: {user_id}")
             return APIResponse.error("User not found", 404)
             
-        current_app.logger.info(f"Found user: {user.username}, current total_points: {user.total_points}")
+        current_app.logger.info(f"Found user: {user.get('username')}, current total_points: {user.get('total_points')}")
         
         now = datetime.utcnow()
         first_day_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         first_day_of_last_month = (first_day_of_month - timedelta(days=1)).replace(day=1)
         
-        current_app.logger.info("Calculating monthly points")
-        monthly_points_query = db.session.query(func.sum(PointHistory.points_change)).filter(
-            and_(
-                PointHistory.user_id == user_id,
-                PointHistory.change_time >= first_day_of_month
-            )
-        )
-        current_app.logger.info(f"Monthly points query: {monthly_points_query}")
-        monthly_points = monthly_points_query.scalar() or 0
+        # 获取用户所有积分历史
+        history_records = PointHistory.list_by_user(user_id)
+        
+        # 计算本月积分
+        monthly_points = 0
+        for record in history_records:
+            change_time = record.get('change_time')
+            if isinstance(change_time, str):
+                change_time = datetime.fromisoformat(change_time.replace('Z', '+00:00'))
+            
+            if change_time >= first_day_of_month:
+                monthly_points += float(record.get('points_change', 0))
+        
         current_app.logger.info(f"Monthly points result: {monthly_points}")
         
-        current_app.logger.info("Calculating last month points")
-        last_month_points_query = db.session.query(func.sum(PointHistory.points_change)).filter(
-            and_(
-                PointHistory.user_id == user_id,
-                PointHistory.change_time >= first_day_of_last_month,
-                PointHistory.change_time < first_day_of_month
-            )
-        )
-        current_app.logger.info(f"Last month points query: {last_month_points_query}")
-        last_month_points = last_month_points_query.scalar() or 0
+        # 计算上月积分
+        last_month_points = 0
+        for record in history_records:
+            change_time = record.get('change_time')
+            if isinstance(change_time, str):
+                change_time = datetime.fromisoformat(change_time.replace('Z', '+00:00'))
+            
+            if first_day_of_last_month <= change_time < first_day_of_month:
+                last_month_points += float(record.get('points_change', 0))
+        
         current_app.logger.info(f"Last month points result: {last_month_points}")
         
-        # 获取最近的积分历史记录
-        recent_history = PointHistory.query.filter_by(user_id=user_id)\
-            .order_by(PointHistory.change_time.desc())\
-            .limit(5).all()
-        current_app.logger.info(f"Recent point history: {[h.to_dict() for h in recent_history]}")
+        # 获取最近的积分历史记录（最多5条）
+        recent_history = sorted(
+            history_records,
+            key=lambda x: x.get('change_time') if isinstance(x.get('change_time'), datetime) else datetime.fromisoformat(x.get('change_time').replace('Z', '+00:00')),
+            reverse=True
+        )[:5]
         
-        current_app.logger.info(f"Statistics - total: {user.total_points}, monthly: {monthly_points}, last_month: {last_month_points}")
+        current_app.logger.info(f"Recent point history: {len(recent_history)} records")
+        
+        current_app.logger.info(f"Statistics - total: {user.get('total_points')}, monthly: {monthly_points}, last_month: {last_month_points}")
         
         return APIResponse.success(data={
-            'total_points': user.total_points,
+            'total_points': float(user.get('total_points', 0)),
             'monthly_points': monthly_points,
             'last_month_points': last_month_points,
-            'recent_history': [h.to_dict() for h in recent_history]
+            'recent_history': recent_history
         })
     except Exception as e:
         current_app.logger.error(f"Error in get_point_statistics: {str(e)}", exc_info=True)
@@ -268,8 +307,6 @@ def adjust_points():
               type: integer
             points_change:
               type: number
-            change_type:
-              type: string
             description:
               type: string
     responses:
@@ -282,36 +319,35 @@ def adjust_points():
       404:
         description: 用户不存在
     """
+    data = request.get_json()
+    
+    # 验证必要字段
+    required_fields = ['user_id', 'points_change', 'description']
+    is_valid, error_msg = validate_required_fields(data, required_fields)
+    if not is_valid:
+        return APIResponse.error(error_msg, 400)
+    
+    user_id = int(data['user_id'])
+    points_change = float(data['points_change'])
+    description = data['description']
+    
+    # 检查用户是否存在
+    user = User.get_by_id(user_id)
+    if not user:
+        return APIResponse.error("用户不存在", 404)
+    
     try:
-        current_app.logger.info("Starting adjust_points")
-        data = request.get_json()
-        current_app.logger.info(f"Request data: {data}")
-        
-        required_fields = ['user_id', 'points_change', 'change_type', 'description']
-        is_valid, error_msg = validate_required_fields(data, required_fields)
-        if not is_valid:
-            current_app.logger.error(f"Validation error: {error_msg}")
-            return APIResponse.error(error_msg, 400)
-            
-        user = User.query.get_or_404(data['user_id'])
-        current_app.logger.info(f"Found user: {user.username}")
-        
-        try:
-            history = PointHistory(
-                user_id=data['user_id'],
-                points_change=data['points_change'],
-                change_type=data['change_type'],
-                description=data['description']
-            )
-            db.session.add(history)
-            user.total_points += data['points_change']
-            db.session.commit()
-            current_app.logger.info(f"Successfully adjusted points for user {user.username}")
+        # 调整用户积分
+        if User.add_points(
+            user_id=user_id,
+            points=points_change,
+            change_type='manual',
+            description=f'手动调整: {description}',
+            related_id=None
+        ):
             return APIResponse.success(msg="积分调整成功")
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f"Database error in adjust_points: {str(e)}", exc_info=True)
-            return APIResponse.error("Failed to adjust points", 500)
+        else:
+            return APIResponse.error("积分调整失败", 500)
     except Exception as e:
-        current_app.logger.error(f"Error in adjust_points: {str(e)}", exc_info=True)
-        raise 
+        current_app.logger.error(f"Error adjusting points: {str(e)}")
+        return APIResponse.error(str(e), 500) 

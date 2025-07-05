@@ -1,23 +1,14 @@
-from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
-from flask_migrate import Migrate
 from flask_cors import CORS
-
-# 数据库
-db = SQLAlchemy()
 
 # JWT认证
 jwt = JWTManager()
 
-# 数据库迁移
-migrate = Migrate()
-
+# CORS
 cors = CORS()
 
 def init_extensions(app):
-    db.init_app(app)
     jwt.init_app(app)
-    migrate.init_app(app, db)
     cors.init_app(app)
     
     # 配置 JWT
@@ -26,7 +17,7 @@ def init_extensions(app):
         app.logger.debug(f"JWT user_identity_lookup called with user: {user}")
         if isinstance(user, str):
             return user
-        return str(user.user_id) if user else None
+        return str(user['user_id']) if user else None
 
     @jwt.user_lookup_loader
     def user_lookup_callback(_jwt_header, jwt_data):
@@ -35,9 +26,9 @@ def init_extensions(app):
         if not identity:
             app.logger.warning("No identity found in JWT data")
             return None
-        from models import User
-        user = User.query.get(int(identity))
-        app.logger.debug(f"Found user: {user.username if user else None}")
+        from models_pymysql import User
+        user = User.get_by_id(int(identity))
+        app.logger.debug(f"Found user: {user['username'] if user else None}")
         return user
 
     @jwt.expired_token_loader

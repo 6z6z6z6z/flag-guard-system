@@ -2,7 +2,7 @@ from functools import wraps
 from flask import jsonify, g, current_app
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
 from flask_jwt_extended.exceptions import NoAuthorizationError, InvalidHeaderError
-from models import User
+from models_pymysql import User
 
 def login_required(fn):
     """验证用户是否登录的装饰器"""
@@ -15,7 +15,7 @@ def login_required(fn):
             # 记录调试信息
             current_app.logger.debug(f"Authenticating user_id: {user_id}")
             
-            user = User.query.get(user_id)
+            user = User.get_by_id(int(user_id))
             if not user:
                 current_app.logger.warning(f"User not found for user_id: {user_id}")
                 return jsonify({'error': '用户不存在'}), 401
@@ -48,12 +48,12 @@ def admin_required(fn):
             # 记录调试信息
             current_app.logger.debug(f"Authenticating admin user_id: {user_id}")
             
-            user = User.query.get(user_id)
+            user = User.get_by_id(int(user_id))
             if not user:
                 current_app.logger.warning(f"User not found for user_id: {user_id}")
                 return jsonify({'error': '用户不存在'}), 401
                 
-            if not user.is_admin():
+            if not User.is_admin(user):
                 current_app.logger.warning(f"Non-admin user attempted admin action: {user_id}")
                 return jsonify({'error': '权限不足'}), 403
                 
