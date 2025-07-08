@@ -42,6 +42,7 @@
               fit="cover"
               class="table-image"
               style="z-index: 9999"
+              @click="handlePreview(getImageUrl(scope.row.photo_url))"
             />
             <span v-else>无照片</span>
           </template>
@@ -101,6 +102,15 @@
         />
       </div>
     </el-card>
+
+    <!-- 添加预览对话框 -->
+    <el-dialog v-model="previewVisible" title="照片预览" width="600px" center :body-style="{ padding: '0' }">
+      <el-image
+        style="width: 100%; height: auto;"
+        :src="previewUrl"
+        fit="contain"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -115,6 +125,10 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const filterStatus = ref('pending')
+
+// 预览图片
+const previewVisible = ref(false)
+const previewUrl = ref('')
 
 // 获取记录列表
 const fetchRecords = async () => {
@@ -302,6 +316,12 @@ const getStatusText = (status: string) => {
   return textMap[status] || status
 }
 
+// 预览图片
+const handlePreview = (url: string) => {
+  previewUrl.value = url;
+  previewVisible.value = true;
+};
+
 // 获取图片URL
 const getImageUrl = (url: string) => {
   if (!url) return '';
@@ -311,29 +331,24 @@ const getImageUrl = (url: string) => {
   // 完整URL直接返回
   if (url.startsWith('http')) return url;
   
-  // 后端返回的URL是 /api/uploads/xxx.jpg
+  // 如果URL以 /api/uploads/ 开头
   if (url.startsWith('/api/uploads/')) {
-    // 去掉 /api 前缀，变成 /uploads/xxx.jpg
-    console.log('Converting API URL:', url, '->', url.substring(4));
-    return url.substring(4);
-  }
-  
-  // 已经是 /uploads/ 开头的URL
-  if (url.startsWith('/uploads/')) {
+    // URL保持不变，不要截取，因为请求时已经加了/api前缀
     return url;
   }
   
-  // 对于历史数据，可能是相对路径或只有文件名
-  if (url.includes('/')) {
-    // 提取文件名
-    const filename = url.split('/').pop();
-    console.log('Extracted filename:', filename);
-    return `/uploads/${filename}`;
-  } else {
-    // 直接是文件名
-    console.log('Using filename directly:', url);
-    return `/uploads/${url}`;
+  // 如果URL以 /uploads/ 开头，需要添加/api前缀
+  if (url.startsWith('/uploads/')) {
+    return `/api${url}`;
   }
+  
+  // 处理只有文件名的情况
+  if (!url.includes('/')) {
+    return `/api/uploads/${url}`;
+  }
+  
+  // 如果是其他格式，尝试修复
+  return `/api/uploads/${url.split('/').pop()}`;
 }
 
 onMounted(() => {

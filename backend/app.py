@@ -207,7 +207,15 @@ def create_app():
     # 添加静态文件服务，确保上传文件可被直接访问
     @app.route('/uploads/<path:filename>')
     def serve_uploads(filename):
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        app.logger.info(f"请求访问上传文件: {filename}")
+        try:
+            app.logger.debug(f"从 {app.config['UPLOAD_FOLDER']} 目录提供文件: {filename}")
+            response = send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+            app.logger.info(f"成功返回文件: {filename}")
+            return response
+        except Exception as e:
+            app.logger.error(f"提供文件 {filename} 时出错: {str(e)}")
+            return "文件不存在或无法访问", 404
     
     return app
 

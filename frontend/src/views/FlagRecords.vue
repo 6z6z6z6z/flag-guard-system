@@ -209,29 +209,24 @@ const getImageUrl = (url: string) => {
   // 完整URL直接返回
   if (url.startsWith('http')) return url;
   
-  // 后端返回的URL是 /api/uploads/xxx.jpg
+  // 如果URL以 /api/uploads/ 开头
   if (url.startsWith('/api/uploads/')) {
-    // 去掉 /api 前缀，变成 /uploads/xxx.jpg
-    console.log('Converting API URL:', url, '->', url.substring(4));
-    return url.substring(4);
-  }
-  
-  // 已经是 /uploads/ 开头的URL
-  if (url.startsWith('/uploads/')) {
+    // URL保持不变，不要截取，因为请求时已经加了/api前缀
     return url;
   }
   
-  // 对于历史数据，可能是相对路径或只有文件名
-  if (url.includes('/')) {
-    // 提取文件名
-    const filename = url.split('/').pop();
-    console.log('Extracted filename:', filename);
-    return `/uploads/${filename}`;
-  } else {
-    // 直接是文件名
-    console.log('Using filename directly:', url);
-    return `/uploads/${url}`;
+  // 如果URL以 /uploads/ 开头，需要添加/api前缀
+  if (url.startsWith('/uploads/')) {
+    return `/api${url}`;
   }
+  
+  // 处理只有文件名的情况
+  if (!url.includes('/')) {
+    return `/api/uploads/${url}`;
+  }
+  
+  // 如果是其他格式，尝试修复
+  return `/api/uploads/${url.split('/').pop()}`;
 }
 
 // 上传相关方法

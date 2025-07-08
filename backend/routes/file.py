@@ -82,7 +82,18 @@ def serve_file(filename):
     """提供上传的文件"""
     current_app.logger.info(f"获取上传的文件: {filename}")
     try:
-        return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        current_app.logger.debug(f"从目录 {upload_folder} 提供文件")
+        
+        # 检查文件是否存在
+        file_path = os.path.join(upload_folder, filename)
+        if not os.path.exists(file_path):
+            current_app.logger.error(f"文件不存在: {file_path}")
+            return APIResponse.error(f"文件不存在: {filename}", 404)
+        
+        response = send_from_directory(upload_folder, filename)
+        current_app.logger.info(f"成功提供文件: {filename}")
+        return response
     except Exception as e:
         current_app.logger.error(f"获取文件错误: {str(e)}", exc_info=True)
-        return APIResponse.error(f"文件不存在: {filename}", 404)
+        return APIResponse.error(f"文件访问错误: {filename} - {str(e)}", 404)
