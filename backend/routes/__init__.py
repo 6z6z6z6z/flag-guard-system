@@ -7,6 +7,7 @@ from routes.points import bp as points_bp
 from routes.flag import bp as flag_bp
 from routes.dashboard import dashboard_bp
 from routes.file import file_bp
+from routes.users_delete import user_delete_bp
 
 def register_blueprints(app: Flask):
     # 注册所有蓝图
@@ -18,6 +19,7 @@ def register_blueprints(app: Flask):
     app.register_blueprint(flag_bp, url_prefix='/api/flag')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
     app.register_blueprint(file_bp, url_prefix='/api')
+    app.register_blueprint(user_delete_bp, url_prefix='/api/user_delete')
     
     # 注册错误处理
     @app.errorhandler(404)

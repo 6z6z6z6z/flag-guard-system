@@ -334,16 +334,42 @@ const handleEdit = (row: any) => {
 // 删除用户
 const handleDelete = async (row: any) => {
   try {
-    await ElMessageBox.confirm('确定要删除这个用户吗？', '提示', {
-      type: 'warning'
-    })
-    await request.delete(`/users/${row.user_id}`)
-    ElMessage.success('删除成功')
-    fetchUsers()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
+    await ElMessageBox.confirm(
+      `确定要删除用户 ${row.name}(${row.username}) 吗？此操作将永久删除该用户的所有数据，包括积分记录、报名记录、升降旗记录等，且无法恢复！`,
+      '危险操作',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+    
+    loading.value = true
+    try {
+      console.log(`开始删除用户ID: ${row.user_id}`)
+      // 使用request工具
+      const response = await request.post('/user_delete/', { 
+        user_id: row.user_id 
+      })
+      
+      console.log('删除用户响应:', response)
+      
+      if (response.code === 200) {
+        ElMessage.success(response.msg || '用户删除成功')
+        // 重新加载用户列表
+        await fetchUsers()
+      } else {
+        ElMessage.error(response.msg || '删除失败')
+      }
+    } catch (error: any) {
+      console.error('删除用户失败:', error)
+      ElMessage.error(error.response?.data?.msg || '删除用户失败，请稍后重试')
+    } finally {
+      loading.value = false
     }
+  } catch (error) {
+    // 用户取消删除，不做任何操作
   }
 }
 

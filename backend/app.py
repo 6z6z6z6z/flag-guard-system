@@ -17,6 +17,7 @@ from flask_jwt_extended import JWTManager
 from datetime import timedelta
 from routes.auth import auth_bp
 from routes.users import users_bp
+from routes.users_delete import user_delete_bp  # 新增：导入用户删除蓝图
 from routes.trainings import bp as trainings_bp
 from routes.events import bp as events_bp
 from routes.points import bp as points_bp
@@ -105,6 +106,14 @@ def setup_cors(app):
             response.headers.add("Access-Control-Allow-Credentials", "true")
             response.headers.add("Access-Control-Max-Age", str(app.config['CORS_MAX_AGE']))
             return response
+    
+    # 打印每个请求的详细信息，便于调试
+    @app.before_request
+    def log_request_detail():
+        app.logger.info(f"Received request: {request.method} {request.path}")
+        app.logger.info(f"Request headers: {dict(request.headers)}")
+        if request.path.startswith('/api/users/') and request.method == 'DELETE':
+            app.logger.info(f"DELETE request to {request.path}")
 
 def setup_error_handlers(app):
     """配置错误处理器"""
@@ -175,6 +184,25 @@ def create_app():
     
     # 注册CLI命令
     init_cli(app)
+    
+    # 添加请求路径日志
+    @app.before_request
+    def log_request_info():
+        app.logger.info(f"收到请求: {request.method} {request.path}")
+        app.logger.info(f"请求头: {request.headers}")
+        if request.method in ['POST', 'PUT']:
+            app.logger.info(f"请求体: {request.get_data(as_text=True)}")
+    
+    # 添加全局404处理
+    @app.errorhandler(404)
+    def handle_404_error(error):
+        if request.path.startswith('/api/'):
+            app.logger.error(f"API 404 错误: {request.method} {request.path}")
+            return jsonify({
+                'code': 404,
+                'msg': f"请求的资源不存在: {request.path}"
+            }), 404
+        return "页面不存在", 404
     
     # 添加静态文件服务，确保上传文件可被直接访问
     @app.route('/uploads/<path:filename>')
