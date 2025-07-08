@@ -162,7 +162,7 @@
         </el-table-column>
         <el-table-column label="报名时间" min-width="150">
           <template #default="scope">
-            {{ scope.row.created_at ? new Date(scope.row.created_at).toLocaleString() : '未知' }}
+            {{ scope.row.created_at ? formatRegistrationTime(scope.row.created_at) : '未知' }}
           </template>
         </el-table-column>
       </el-table>
@@ -178,6 +178,7 @@ import { useUserStore } from '../stores/user'
 import request from '../utils/request'
 import { useRouter } from 'vue-router'
 import { Plus, Location, Timer, Umbrella } from '@element-plus/icons-vue'
+import { formatRegistrationTime } from '../utils/formatDate'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -234,13 +235,18 @@ const rules = {
 
 // 检查活动是否已过期，并返回状态字符串
 const getEventDisplayStatus = (time: string): string => {
-  return new Date(time) < new Date() ? '已结束' : '未开始'
+  // 将UTC时间转换为北京时间（UTC+8）后再比较
+  const eventDate = new Date(time)
+  const utcEventDate = new Date(eventDate.getTime() + 8 * 60 * 60 * 1000)
+  return utcEventDate < new Date() ? '已结束' : '未开始'
 }
 
 // 格式化时间显示
 const formatTime = (time: string) => {
+  // 将UTC时间转换为北京时间（UTC+8）
   const date = new Date(time)
-  return date.toLocaleString('zh-CN', {
+  const utcDate = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+  return utcDate.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -397,8 +403,9 @@ const handleSubmit = async () => {
       timeValue = new Date(timeValue)
     }
     
-    // 转换为UTC时间
-    const utcTime = new Date(timeValue.getTime() - timeValue.getTimezoneOffset() * 60000)
+    // 转换为UTC时间（需考虑北京时间是UTC+8）
+    // 从本地时间转为UTC时，需要减去8小时的时差
+    const utcTime = new Date(timeValue.getTime() - 8 * 60 * 60 * 1000)
     
     const formData = {
       ...form.value,
@@ -455,7 +462,7 @@ const registrationsDialogVisible = ref(false)
 const registrationsLoading = ref(false)
 const registrations = ref<any[]>([])
 
-    // 显示报名人员名单
+// 显示报名人员名单
 const showRegistrations = async (row: Event) => {
   try {
     registrationsLoading.value = true
@@ -488,11 +495,43 @@ const showRegistrations = async (row: Event) => {
         registrationItems = response.data.data
       }
       
-      // 确保每条记录都有created_at字段
-      registrations.value = registrationItems.map((reg: any) => ({
-        ...reg,
-        created_at: reg.created_at ? new Date(reg.created_at).toLocaleString() : new Date().toLocaleString()
-      }))
+      // 处理创建时间，确保日期格式正确显示
+      registrations.value = registrationItems.map((reg: any) => {
+        // 确保created_at字段存在
+        const createdAt = reg.created_at || new Date().toISOString();
+        
+        // 处理MySQL日期时间格式，添加8小时转为北京时间
+        let formattedDate: Date;
+        if (typeof createdAt === 'string') {
+          if (createdAt.includes('T') || createdAt.includes('Z')) {
+            // ISO格式
+            formattedDate = new Date(new Date(createdAt).getTime() + 8 * 60 * 60 * 1000);
+          } else {
+            // 普通MySQL格式
+            formattedDate = new Date(new Date(createdAt.replace(' ', 'T')).getTime() + 8 * 60 * 60 * 1000);
+          }
+        } else {
+          formattedDate = new Date(new Date(createdAt).getTime() + 8 * 60 * 60 * 1000);
+        }
+        
+        // 格式化为本地时间字符串
+        const localDateStr = formattedDate.toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        
+        return {
+          ...reg,
+          // 存储原始时间和格式化后的时间
+          created_at_original: createdAt,
+          created_at: localDateStr
+        };
+      });
       
       console.log('处理后的报名数据:', registrations.value)
     } else {

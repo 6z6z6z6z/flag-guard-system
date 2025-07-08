@@ -12,8 +12,12 @@ class BaseModel:
     
     @staticmethod
     def convert_datetime(value):
-        """转换datetime为ISO格式字符串"""
+        """转换datetime为ISO格式字符串，并确保时区信息正确"""
         if isinstance(value, datetime):
+            # 如果时间没有时区信息，假设为UTC时间
+            if value.tzinfo is None:
+                # 返回ISO格式带Z后缀，表明这是UTC时间
+                return value.isoformat() + 'Z'
             return value.isoformat()
         return value
     
@@ -471,7 +475,8 @@ class Event(BaseModel):
         if isinstance(event_time, str):
             event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
             
-        return '未开始' if event_time > datetime.now() else '已开始'
+        # 使用UTC时间进行比较，确保一致的时区处理
+        return '未开始' if event_time > datetime.utcnow() else '已开始'
     
     @classmethod
     def to_dict(cls, event):

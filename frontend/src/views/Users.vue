@@ -3,13 +3,26 @@
     <div class="header-controls">
       <h1 class="page-title">用户管理</h1>
       <div class="header-actions">
-        <el-input
-          v-model="searchQuery"
-          placeholder="搜索用户（用户名/姓名/学号）"
-          aria-label="搜索用户"
-          class="search-input"
-          @input="handleSearch"
-        />
+        <div class="search-area">
+          <el-input
+            v-model="searchQuery"
+            placeholder="搜索用户（用户名/姓名/学号）"
+            clearable
+            style="width: 250px"
+            @input="handleSearchInput"
+            @clear="clearSearch"
+          >
+            <template #prefix>
+              <el-icon class="el-input__icon"><el-icon-search /></el-icon>
+            </template>
+            <template #suffix v-if="searchQuery">
+              <el-icon class="el-input__icon" style="cursor: pointer" @click="clearSearch">
+                <el-icon-close />
+              </el-icon>
+            </template>
+          </el-input>
+          <el-button v-if="searchQuery" type="info" @click="handleSearch" size="small">查询</el-button>
+        </div>
         <!-- <el-button type="primary" @click="handleCreate">
           创建用户
         </el-button> -->
@@ -125,6 +138,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../utils/request'
 import type { FormInstance } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { Search as ElIconSearch, Close as ElIconClose } from '@element-plus/icons-vue'
 
 const getRoleText = (role: string) => {
   switch (role) {
@@ -176,6 +190,7 @@ const searchQuery = ref('')
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const formRef = ref<FormInstance>()
+// 移除未使用的变量
 const form = ref({
   id: null,
   username: '',
@@ -220,10 +235,56 @@ const fetchUsers = async () => {
   }
 }
 
-// 搜索处理
-const handleSearch = () => {
-  currentPage.value = 1
-  fetchUsers()
+// 搜索防抖定时器
+let searchTimeout: number | null = null
+
+// 处理搜索输入
+const handleSearchInput = () => {
+  if (searchTimeout !== null) {
+    clearTimeout(searchTimeout)
+  }
+  
+  searchTimeout = window.setTimeout(() => {
+    if (searchQuery.value.trim().length >= 2) {
+      // 自动搜索
+      handleSearch()
+    } else if (searchQuery.value.trim().length === 0) {
+      // 如果清空了搜索框，恢复显示所有用户但不显示消息
+      clearSearch(false)
+    }
+  }, 500) // 500ms 防抖延迟
+}
+
+// 执行搜索
+const handleSearch = async () => {
+  if (!searchQuery.value.trim()) {
+    return clearSearch(true)
+  }
+  
+  loading.value = true
+  try {
+    // 使用精确搜索API，直接查询匹配的用户
+    const { data: searchResult } = await request.get('/users/search', {
+      params: { query: searchQuery.value }
+    })
+    
+    if (searchResult && searchResult.length > 0) {
+      // 如果找到匹配的用户，只显示这些用户
+      users.value = searchResult
+      total.value = searchResult.length
+      currentPage.value = 1
+    } else {
+      // 如果没有匹配的用户，显示空列表
+      users.value = []
+      total.value = 0
+      ElMessage.info('未找到匹配的用户')
+    }
+  } catch (error: any) {
+    console.error('搜索用户失败:', error)
+    ElMessage.error(error.response?.data?.msg || '搜索用户失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 分页处理
@@ -324,8 +385,20 @@ const handleSubmit = async () => {
 }
 
 onMounted(() => {
+  currentPage.value = 1
   fetchUsers()
 })
+
+// 清空搜索
+const clearSearch = (showMessage = true) => {
+  searchQuery.value = ''
+  currentPage.value = 1
+  // 重置后获取所有用户
+  fetchUsers()
+  if (showMessage) {
+    ElMessage.info('已清除筛选条件，显示所有用户')
+  }
+}
 </script>
 
 <style scoped>
@@ -345,13 +418,32 @@ onMounted(() => {
   margin: 0;
 }
 
-.search-input {
-  width: 250px;
+.search-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.el-input__icon {
+  font-size: 16px;
+  line-height: 32px;
 }
 
 .pagination {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+:deep(.user-search-dropdown) {
+  .el-select-dropdown__item {
+    padding: 12px 16px;
+    line-height: 1.5;
+    
+    &.selected {
+      font-weight: bold;
+      color: var(--el-color-primary);
+    }
+  }
 }
 </style>

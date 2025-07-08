@@ -203,7 +203,54 @@ def search_users():
     # 搜索用户名、姓名或学号包含关键词的用户
     users = User.search(query)
     
-    return APIResponse.success(data=users)
+    # 确保返回的用户信息格式一致
+    result_users = []
+    for user in users:
+        result_users.append({
+            'user_id': user['user_id'],
+            'username': user['username'],
+            'name': user['name'],
+            'student_id': user['student_id'],
+            'college': user['college'],
+            'total_points': user['total_points'],
+            'role': user['role'],
+            'phone_number': user['phone_number']
+        })
+    
+    return APIResponse.success(data=result_users)
+
+@users_bp.route('/by_id', methods=['GET'])
+@jwt_required()
+@handle_exceptions
+def get_user_by_id():
+    """
+    根据用户ID获取用户
+    ---
+    tags:
+      - 用户
+    security:
+      - Bearer: []
+    parameters:
+      - name: user_id
+        in: query
+        type: integer
+        required: true
+        description: 用户ID
+    responses:
+      200:
+        description: 成功获取用户
+      404:
+        description: 用户不存在
+    """
+    user_id = request.args.get('user_id', type=int)
+    if not user_id:
+        return APIResponse.error("用户ID不能为空", 400)
+    
+    user = User.get_by_id(user_id)
+    if not user:
+        return APIResponse.error("用户不存在", 404)
+    
+    return APIResponse.success(data=User.to_dict(user))
 
 @users_bp.route('/points/all', methods=['GET'])
 @jwt_required()
@@ -231,6 +278,10 @@ def get_all_users_points():
         type: string
         default: points_desc
         description: 排序方式，可选值：points_desc, points_asc, name_asc, name_desc
+      - name: query
+        in: query
+        type: string
+        description: 搜索关键词（用户名、姓名或学号）
     responses:
       200:
         description: 成功获取用户积分列表
@@ -239,9 +290,10 @@ def get_all_users_points():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     sort_by = request.args.get('sort', 'points_desc')
+    search_query = request.args.get('query', '')
     
-    # 获取所有用户
-    all_users = User.list_all()
+    # 根据搜索条件获取用户
+    all_users = User.search(search_query) if search_query else User.list_all()
     
     # 根据排序参数对用户进行排序
     if sort_by == 'points_desc':
