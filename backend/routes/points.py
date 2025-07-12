@@ -392,10 +392,14 @@ def get_point_statistics():
         for record in history_records:
             try:
                 change_time = record.get('change_time')
-                # 处理时间，假设数据库中的时间已经是北京时间
+                # 处理时间，确保最终都是带时区的datetime对象用于比较
                 if isinstance(change_time, datetime):
-                    # 如果是datetime对象，直接使用，不进行时区转换
-                    beijing_time = change_time
+                    # 如果是datetime对象，确保它有时区信息
+                    if change_time.tzinfo is None:
+                        # 无时区信息，假设是北京时间
+                        beijing_time = change_time.replace(tzinfo=BEIJING_TZ)
+                    else:
+                        beijing_time = change_time
                 elif isinstance(change_time, str):
                     # 先尝试解析字符串为datetime
                     try:
@@ -406,8 +410,9 @@ def get_point_statistics():
                             if beijing_time.tzinfo and beijing_time.tzinfo == timezone.utc:
                                 beijing_time = beijing_time.astimezone(BEIJING_TZ)
                         else:
-                            # 普通格式，假设已经是北京时间
-                            beijing_time = datetime.strptime(change_time, '%Y-%m-%d %H:%M:%S')
+                            # 普通格式，假设已经是北京时间，添加时区信息
+                            naive_time = datetime.strptime(change_time, '%Y-%m-%d %H:%M:%S')
+                            beijing_time = naive_time.replace(tzinfo=BEIJING_TZ)
                     except Exception as parse_error:
                         current_app.logger.warning(f"Failed to parse time string '{change_time}': {parse_error}")
                         continue
@@ -430,10 +435,14 @@ def get_point_statistics():
         for record in history_records:
             try:
                 change_time = record.get('change_time')
-                # 处理时间，假设数据库中的时间已经是北京时间
+                # 处理时间，确保最终都是带时区的datetime对象用于比较
                 if isinstance(change_time, datetime):
-                    # 如果是datetime对象，直接使用，不进行时区转换
-                    beijing_time = change_time
+                    # 如果是datetime对象，确保它有时区信息
+                    if change_time.tzinfo is None:
+                        # 无时区信息，假设是北京时间
+                        beijing_time = change_time.replace(tzinfo=BEIJING_TZ)
+                    else:
+                        beijing_time = change_time
                 elif isinstance(change_time, str):
                     # 先尝试解析字符串为datetime
                     try:
@@ -444,8 +453,9 @@ def get_point_statistics():
                             if beijing_time.tzinfo and beijing_time.tzinfo == timezone.utc:
                                 beijing_time = beijing_time.astimezone(BEIJING_TZ)
                         else:
-                            # 普通格式，假设已经是北京时间
-                            beijing_time = datetime.strptime(change_time, '%Y-%m-%d %H:%M:%S')
+                            # 普通格式，假设已经是北京时间，添加时区信息
+                            naive_time = datetime.strptime(change_time, '%Y-%m-%d %H:%M:%S')
+                            beijing_time = naive_time.replace(tzinfo=BEIJING_TZ)
                     except Exception as parse_error:
                         current_app.logger.warning(f"Failed to parse time string '{change_time}': {parse_error}")
                         continue

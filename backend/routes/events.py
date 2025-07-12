@@ -7,7 +7,7 @@ from utils.route_utils import (
     APIResponse, validate_required_fields, handle_exceptions,
     validate_json_request, role_required
 )
-from utils.time_utils import TimeUtils
+from utils.time_utils import TimeUtils, BEIJING_TZ
 from sql.queries import EVENT_QUERIES, EVENT_REGISTRATION_QUERIES, EVENT_TRAINING_QUERIES
 
 bp = Blueprint('events', __name__)
@@ -314,15 +314,28 @@ def register_for_event(event_id):
         return APIResponse.error("活动不存在", 404)
     
     # 检查是否为过期活动（基于北京时间）
-    # 从数据库读取的时间是UTC时间，需要先转换为北京时间
-    event_time = TimeUtils.from_db_to_beijing(event['time'])
-    current_beijing_time = TimeUtils.now_beijing()
+    # event['time'] 是经过 format_dict 格式化的字符串，需要先转换为 datetime 对象
+    try:
+        event_time_str = event['time']
+        if isinstance(event_time_str, str):
+            # 将字符串时间转换为 datetime 对象，并添加北京时区信息
+            event_time_naive = datetime.strptime(event_time_str, '%Y-%m-%d %H:%M:%S')
+            # 将naive datetime转换为北京时区的aware datetime
+            event_time = event_time_naive.replace(tzinfo=BEIJING_TZ)
+        else:
+            event_time = event_time_str
+        
+        current_beijing_time = TimeUtils.now_beijing()
+        
+        current_app.logger.info(f"活动时间: {event_time}, 当前北京时间: {current_beijing_time}")
+        
+        if event_time and event_time < current_beijing_time:
+            current_app.logger.warning(f"活动 {event_id} 已过期，活动时间: {event_time}, 当前时间: {current_beijing_time}")
+            return APIResponse.error("不能报名已过期的活动", 400)
     
-    current_app.logger.info(f"活动时间: {event_time}, 当前北京时间: {current_beijing_time}")
-    
-    if event_time and event_time < current_beijing_time:
-        current_app.logger.warning(f"活动 {event_id} 已过期，活动时间: {event_time}, 当前时间: {current_beijing_time}")
-        return APIResponse.error("不能报名已过期的活动", 400)
+    except Exception as e:
+        current_app.logger.error(f"处理活动时间时发生错误: {str(e)}")
+        return APIResponse.error("处理活动时间时发生错误", 500)
     
     # 检查是否已经报名
     existing_registration = EventRegistration.get_by_event_and_user(event_id, user_id)
