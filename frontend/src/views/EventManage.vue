@@ -322,6 +322,30 @@ const isEventPast = (time: string) => {
   return new Date(time).getTime() < Date.now()
 }
 
+// 格式化时间为后端需要的格式（保持本地时区）
+const formatDateTimeForBackend = (date: Date | string) => {
+  const d = new Date(date)
+  // 获取本地时区偏移（分钟）
+  const timezoneOffset = d.getTimezoneOffset()
+  // 创建一个新的Date对象，调整时区偏移
+  const localDate = new Date(d.getTime() - (timezoneOffset * 60000))
+  // 返回ISO格式但保持本地时间
+  return localDate.toISOString().slice(0, 19) + '+08:00'
+}
+
+// 解析后端返回的时间字符串
+const parseBackendDateTime = (timeStr: string | Date) => {
+  if (timeStr instanceof Date) {
+    return timeStr
+  }
+  // 如果时间字符串包含时区信息，直接解析
+  if (timeStr.includes('+') || timeStr.includes('Z')) {
+    return new Date(timeStr)
+  }
+  // 否则假设是本地时间
+  return new Date(timeStr)
+}
+
 // 创建活动
 const handleSubmit = async () => {
   if (!formRef.value) return
@@ -329,10 +353,10 @@ const handleSubmit = async () => {
   await formRef.value.validate(async (valid: boolean) => {
     if (valid) {
       try {
-        // 处理时间格式
+        // 处理时间格式 - 保持本地时区
         const formData = {
           ...form.value,
-          time: form.value.time ? new Date(form.value.time).toISOString() : null
+          time: form.value.time ? formatDateTimeForBackend(form.value.time) : null
         }
         
         console.log('提交的表单数据:', formData)  // 添加调试日志
@@ -362,7 +386,7 @@ const handleEdit = (event: Event) => {
   currentEvent.value = event
   editForm.value = {
     name: event.name,
-    time: new Date(event.time),  // 转换时间格式
+    time: parseBackendDateTime(event.time),  // 正确解析后端时间
     uniform_required: event.uniform_required || '',
     trainings: event.trainings.map(t => t.training_id)
   }

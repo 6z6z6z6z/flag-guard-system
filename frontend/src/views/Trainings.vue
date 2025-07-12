@@ -97,7 +97,6 @@
             type="datetime"
             placeholder="选择开始日期时间"
             format="YYYY-MM-DD HH:mm"
-            value-format="YYYY-MM-DD HH:mm:ss"
             style="width: 100%"
           />
         </el-form-item>
@@ -107,7 +106,6 @@
             type="datetime"
             placeholder="选择结束日期时间"
             format="YYYY-MM-DD HH:mm"
-            value-format="YYYY-MM-DD HH:mm:ss"
             style="width: 100%"
           />
         </el-form-item>
@@ -190,6 +188,8 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import request from '../utils/request';
 import { Plus, Calendar, Location, Star } from '@element-plus/icons-vue';
+import { formatDateTimeRange, formatTimeForBackend, formatRegistrationTime } from '../utils/formatDate';
+import dayjs from 'dayjs';
 
 interface Training {
   training_id: number;
@@ -247,14 +247,14 @@ const rules = reactive<FormRules>({
 });
 
 const getTrainingStatus = (training: Training) => {
-  const now = new Date();
-  const startTime = new Date(training.start_time);
-  const endTime = new Date(training.end_time);
+  const now = dayjs();
+  const startTime = dayjs(training.start_time);
+  const endTime = dayjs(training.end_time);
 
-  if (now > endTime) {
+  if (now.isAfter(endTime)) {
     return { text: '已结束', type: 'info' as const };
   }
-  if (now >= startTime && now <= endTime) {
+  if ((now.isAfter(startTime) || now.isSame(startTime)) && (now.isBefore(endTime) || now.isSame(endTime))) {
     return { text: '进行中', type: 'success' as const };
   }
   return { text: '未开始', type: 'warning' as const };
@@ -264,8 +264,8 @@ const resetForm = () => {
   form.training_id = null;
   form.name = '';
 
-  const startDate = new Date();
-  const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour later
+  const startDate = dayjs().toDate();
+  const endDate = dayjs().add(1, 'hour').toDate(); // 1 hour later
   form.start_time = startDate;
   form.end_time = endDate;
   
@@ -321,8 +321,10 @@ const handleEdit = (training: Training) => {
   isEdit.value = true;
   form.training_id = training.training_id;
   form.name = training.name;
-  form.start_time = new Date(training.start_time);
-  form.end_time = new Date(training.end_time);
+  
+  // 直接使用后端返回的时间，dayjs会正确解析包含时区信息的ISO字符串
+  form.start_time = dayjs(training.start_time).toDate();
+  form.end_time = dayjs(training.end_time).toDate();
   form.points = training.points;
   form.location = training.location;
   dialogVisible.value = true;
@@ -334,15 +336,15 @@ const handleSubmit = async () => {
     if (valid) {
       if (!form.start_time || !form.end_time) return;
 
-      if (new Date(form.end_time) <= new Date(form.start_time)) {
+      if (dayjs(form.end_time).isBefore(dayjs(form.start_time)) || dayjs(form.end_time).isSame(dayjs(form.start_time))) {
         ElMessage.error('结束时间必须晚于开始时间');
         return;
       }
       
       const payload = {
         name: form.name,
-        start_time: form.start_time,
-        end_time: form.end_time,
+        start_time: formatTimeForBackend(form.start_time),
+        end_time: formatTimeForBackend(form.end_time),
         points: form.points,
         location: form.location,
         training_id: form.training_id,
@@ -415,7 +417,7 @@ const isAttendanceDisabled = computed(() => {
     return true;
   }
   // 如果训练尚未开始，禁用
-  if (new Date(currentTraining.value.start_time) > new Date()) {
+  if (dayjs(currentTraining.value.start_time).isAfter(dayjs())) {
     return true;
   }
   // 如果已经有任何一个报名记录被授予了积分，禁用
@@ -450,23 +452,6 @@ const handleViewRegistrations = async (training: Training) => {
   }
 };
 
-const formatRegistrationTime = (isoString: string | null) => {
-  if (!isoString) return '';
-  const date = new Date(isoString);
-  if (isNaN(date.getTime())) {
-    return '日期无效';
-  }
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
-};
-
 const submitAttendance = async () => {
   if (!currentTraining.value) return;
   isSubmitting.value = true;
@@ -488,33 +473,6 @@ const submitAttendance = async () => {
   } finally {
     isSubmitting.value = false;
   }
-};
-
-const formatDateTimeRange = (start: string, end: string) => {
-  if (!start) return 'N/A';
-  
-  const startDate = new Date(start);
-  const startDateTime = startDate.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).replace(/,/g, '');
-
-  if (!end) {
-    return startDateTime;
-  }
-
-  const endDate = new Date(end);
-  const endTime = endDate.toLocaleString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
-
-  return `${startDateTime} - ${endTime}`;
 };
 
 onMounted(() => {

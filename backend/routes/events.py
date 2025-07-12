@@ -7,6 +7,7 @@ from utils.route_utils import (
     APIResponse, validate_required_fields, handle_exceptions,
     validate_json_request, role_required
 )
+from utils.time_utils import TimeUtils
 from sql.queries import EVENT_QUERIES, EVENT_REGISTRATION_QUERIES, EVENT_TRAINING_QUERIES
 
 bp = Blueprint('events', __name__)
@@ -88,52 +89,36 @@ def get_events():
 @validate_json_request
 @handle_exceptions
 def create_event():
-    """
-    创建活动
-    ---
-    tags:
-      - 活动
-    security:
-      - Bearer: []
-    parameters:
-      - name: body
-        in: body
-        required: true
-        schema:
-          type: object
-          properties:
-            name:
-              type: string
-            time:
-              type: string
-              format: date-time
-            uniform_required:
-              type: string
-            trainings:
-              type: array
-              items:
-                type: integer
-    responses:
-      201:
-        description: 活动创建成功
-      400:
-        description: 参数错误
-      403:
-        description: 权限不足
-    """
+    """创建活动"""
+    current_app.logger.info("=== 开始创建活动 ===")
+    
     data = request.get_json()
+    current_app.logger.info(f"接收到的完整数据: {data}")
     
     # 验证必填字段
     required_fields = ['name', 'time']
     is_valid, error_msg = validate_required_fields(data, required_fields)
     if not is_valid:
+        current_app.logger.error(f"字段验证失败: {error_msg}")
         return APIResponse.error(error_msg, 400)
     
     try:
-        # 创建活动
+        # 记录接收到的原始数据
+        current_app.logger.info(f"创建活动接收到的数据: {data}")
+        
+        # 解析前端传来的北京时间
+        time_str = data['time']
+        current_app.logger.info(f"原始时间字符串: {time_str}")
+        
+        parsed_time = TimeUtils.parse_frontend_time(time_str)
+        if not parsed_time:
+            return APIResponse.error('时间格式无效', 400)
+            
+        current_app.logger.info(f"解析后的北京时间: {parsed_time}")
+        
         event = Event.create(
             name=data['name'],
-            time=datetime.fromisoformat(data['time'].replace('Z', '+00:00')),
+            time=parsed_time,
             location=data.get('location'),
             uniform_required=data.get('uniform_required'),
             created_by=get_jwt_identity()
@@ -204,11 +189,11 @@ def update_event(event_id):
     if not event:
         return APIResponse.error("活动不存在", 404)
     
-    # 检查是否为过期活动
-    event_time = event['time']
-    if isinstance(event_time, str):
-        event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
-    if event_time < datetime.utcnow():
+    # 检查是否为过期活动（基于北京时间）
+    event_time = TimeUtils.to_beijing_time(event['time'])
+    current_beijing_time = TimeUtils.now_beijing()
+    
+    if event_time and event_time < current_beijing_time:
         return APIResponse.error("不能修改已过期的活动", 400)
     
     data = request.get_json()
@@ -220,11 +205,16 @@ def update_event(event_id):
         return APIResponse.error(error_msg, 400)
     
     try:
+        # 解析前端传来的北京时间
+        parsed_time = TimeUtils.parse_frontend_time(data['time'])
+        if not parsed_time:
+            return APIResponse.error('时间格式无效', 400)
+        
         # 更新基本信息
         updated_event = Event.update(
             event_id=event_id,
             name=data['name'],
-            time=datetime.fromisoformat(data['time'].replace('Z', '+00:00')),
+            time=parsed_time,
             location=data.get('location'),
             uniform_required=data.get('uniform_required')
         )
@@ -323,16 +313,21 @@ def register_for_event(event_id):
     if not event:
         return APIResponse.error("活动不存在", 404)
     
-    # 检查是否为过期活动
-    event_time = event['time']
-    if isinstance(event_time, str):
-        event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
-    if event_time < datetime.utcnow():
+    # 检查是否为过期活动（基于北京时间）
+    # 从数据库读取的时间是UTC时间，需要先转换为北京时间
+    event_time = TimeUtils.from_db_to_beijing(event['time'])
+    current_beijing_time = TimeUtils.now_beijing()
+    
+    current_app.logger.info(f"活动时间: {event_time}, 当前北京时间: {current_beijing_time}")
+    
+    if event_time and event_time < current_beijing_time:
+        current_app.logger.warning(f"活动 {event_id} 已过期，活动时间: {event_time}, 当前时间: {current_beijing_time}")
         return APIResponse.error("不能报名已过期的活动", 400)
     
     # 检查是否已经报名
     existing_registration = EventRegistration.get_by_event_and_user(event_id, user_id)
     if existing_registration:
+        current_app.logger.warning(f"用户 {user_id} 已经报名活动 {event_id}")
         return APIResponse.error("你已经报名参加此活动", 400)
     
     try:
@@ -382,11 +377,11 @@ def cancel_event_registration(event_id):
     if not event:
         return APIResponse.error("活动不存在", 404)
     
-    # 检查是否为过期活动
-    event_time = event['time']
-    if isinstance(event_time, str):
-        event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
-    if event_time < datetime.utcnow():
+    # 检查是否为过期活动（基于北京时间）
+    event_time = TimeUtils.to_beijing_time(event['time'])
+    current_beijing_time = TimeUtils.now_beijing()
+    
+    if event_time and event_time < current_beijing_time:
         return APIResponse.error("不能取消已过期活动的报名", 400)
     
     # 检查是否已经报名

@@ -4,6 +4,7 @@ import re
 from werkzeug.security import generate_password_hash, check_password_hash
 from db_connection import db
 from sql.queries import *
+from utils.time_utils import TimeUtils, BEIJING_TZ
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +13,11 @@ class BaseModel:
     
     @staticmethod
     def convert_datetime(value):
-        """转换datetime为ISO格式字符串，并确保时区信息正确"""
+        """转换datetime为前端显示格式（北京时间）"""
         if isinstance(value, datetime):
-            # 如果时间没有时区信息，假设为UTC时间
-            if value.tzinfo is None:
-                # 返回ISO格式带Z后缀，表明这是UTC时间
-                return value.isoformat() + 'Z'
-            return value.isoformat()
+            # 直接格式化datetime对象，不进行时区转换
+            # 因为数据库中的时间已经是正确的时间
+            return value.strftime('%Y-%m-%d %H:%M:%S')
         return value
     
     @classmethod
@@ -26,10 +25,23 @@ class BaseModel:
         """格式化字典，处理特殊类型"""
         if not data:
             return {}
-        result = {}
-        for key, value in data.items():
-            result[key] = cls.convert_datetime(value)
-        return result
+        
+        try:
+            result = {}
+            for key, value in data.items():
+                if value is None:
+                    result[key] = None
+                elif isinstance(value, datetime):
+                    # 直接格式化datetime对象，不进行时区转换
+                    # 因为数据库中的时间已经是正确的时间
+                    result[key] = value.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    result[key] = value
+            return result
+        except Exception as e:
+            logger.error(f"格式化字典失败: {str(e)}, data: {data}")
+            # 返回一个基本的字典，避免完全失败
+            return dict(data) if hasattr(data, 'items') else {}
 
 class User(BaseModel):
     """用户模型"""
@@ -43,8 +55,8 @@ class User(BaseModel):
     def get_by_id(cls, user_id):
         """根据ID获取用户"""
         try:
-            data = db.execute_query(USER_QUERIES['get_by_id'], (user_id,), fetch_one=True)
-            return data
+            raw_data = db.execute_query(USER_QUERIES['get_by_id'], (user_id,), fetch_one=True)
+            return cls.format_dict(raw_data) if raw_data else None
         except Exception as e:
             logger.error(f"获取用户失败: {str(e)}")
             return None
@@ -53,8 +65,8 @@ class User(BaseModel):
     def get_by_username(cls, username):
         """根据用户名获取用户"""
         try:
-            data = db.execute_query(USER_QUERIES['get_by_username'], (username,), fetch_one=True)
-            return data
+            raw_data = db.execute_query(USER_QUERIES['get_by_username'], (username,), fetch_one=True)
+            return cls.format_dict(raw_data) if raw_data else None
         except Exception as e:
             logger.error(f"根据用户名获取用户失败: {str(e)}")
             return None
@@ -63,8 +75,8 @@ class User(BaseModel):
     def get_by_student_id(cls, student_id):
         """根据学号获取用户"""
         try:
-            data = db.execute_query(USER_QUERIES['get_by_student_id'], (student_id,), fetch_one=True)
-            return data
+            raw_data = db.execute_query(USER_QUERIES['get_by_student_id'], (student_id,), fetch_one=True)
+            return cls.format_dict(raw_data) if raw_data else None
         except Exception as e:
             logger.error(f"根据学号获取用户失败: {str(e)}")
             return None
@@ -203,6 +215,12 @@ class Training(BaseModel):
     def create(cls, name, start_time, end_time, points, location, created_by, status='scheduled'):
         """创建训练"""
         try:
+            # 前端传来的时间已经是北京时间，直接存储（移除时区信息）
+            if hasattr(start_time, 'replace') and start_time.tzinfo:
+                start_time = start_time.replace(tzinfo=None)
+            if hasattr(end_time, 'replace') and end_time.tzinfo:
+                end_time = end_time.replace(tzinfo=None)
+            
             training_id = db.execute_insert(
                 TRAINING_QUERIES['create'],
                 (name, start_time, end_time, points, location, created_by, status)
@@ -225,6 +243,12 @@ class Training(BaseModel):
     def update(cls, training_id, name, start_time, end_time, points, location, status):
         """更新训练信息"""
         try:
+            # 前端传来的时间已经是北京时间，直接存储（移除时区信息）
+            if hasattr(start_time, 'replace') and start_time.tzinfo:
+                start_time = start_time.replace(tzinfo=None)
+            if hasattr(end_time, 'replace') and end_time.tzinfo:
+                end_time = end_time.replace(tzinfo=None)
+            
             db.execute_update(
                 TRAINING_QUERIES['update'],
                 (name, start_time, end_time, points, location, status, training_id)
@@ -301,11 +325,12 @@ class TrainingRegistration(BaseModel):
     def get_by_id(cls, registration_id):
         """根据ID获取报名信息"""
         try:
-            return db.execute_query(
+            raw_data = db.execute_query(
                 TRAINING_REGISTRATION_QUERIES['get_by_id'], 
                 (registration_id,), 
                 fetch_one=True
             )
+            return cls.format_dict(raw_data) if raw_data else None
         except Exception as e:
             logger.error(f"获取报名信息失败: {str(e)}")
             return None
@@ -314,11 +339,12 @@ class TrainingRegistration(BaseModel):
     def get_by_training_and_user(cls, training_id, user_id):
         """根据训练和用户获取报名信息"""
         try:
-            return db.execute_query(
+            raw_data = db.execute_query(
                 TRAINING_REGISTRATION_QUERIES['get_by_training_and_user'], 
                 (training_id, user_id), 
                 fetch_one=True
             )
+            return cls.format_dict(raw_data) if raw_data else None
         except Exception as e:
             logger.error(f"获取报名信息失败: {str(e)}")
             return None
@@ -361,7 +387,8 @@ class TrainingRegistration(BaseModel):
     def list_by_training(cls, training_id):
         """列出训练的所有报名记录"""
         try:
-            return db.execute_query(TRAINING_REGISTRATION_QUERIES['list_by_training'], (training_id,))
+            raw_data = db.execute_query(TRAINING_REGISTRATION_QUERIES['list_by_training'], (training_id,))
+            return [cls.format_dict(item) for item in raw_data]
         except Exception as e:
             logger.error(f"获取训练报名列表失败: {str(e)}")
             return []
@@ -370,7 +397,8 @@ class TrainingRegistration(BaseModel):
     def list_by_user(cls, user_id):
         """列出用户的所有报名记录"""
         try:
-            return db.execute_query(TRAINING_REGISTRATION_QUERIES['list_by_user'], (user_id,))
+            raw_data = db.execute_query(TRAINING_REGISTRATION_QUERIES['list_by_user'], (user_id,))
+            return [cls.format_dict(item) for item in raw_data]
         except Exception as e:
             logger.error(f"获取用户报名列表失败: {str(e)}")
             return []
@@ -391,6 +419,10 @@ class Event(BaseModel):
     def create(cls, name, time, location, uniform_required, created_by):
         """创建活动"""
         try:
+            # 前端传来的时间已经是北京时间，直接存储（移除时区信息）
+            if hasattr(time, 'replace') and time.tzinfo:
+                time = time.replace(tzinfo=None)
+            
             event_id = db.execute_insert(
                 EVENT_QUERIES['create'],
                 (name, time, location, uniform_required, created_by)
@@ -404,12 +436,14 @@ class Event(BaseModel):
     def get_by_id(cls, event_id):
         """根据ID获取活动"""
         try:
-            event = db.execute_query(EVENT_QUERIES['get_by_id'], (event_id,), fetch_one=True)
-            if event:
+            raw_event = db.execute_query(EVENT_QUERIES['get_by_id'], (event_id,), fetch_one=True)
+            if raw_event:
+                event = cls.format_dict(raw_event)
                 # 获取活动关联的训练
                 trainings = EventTraining.list_by_event(event_id)
                 event['trainings'] = trainings
-            return event
+                return event
+            return None
         except Exception as e:
             logger.error(f"获取活动失败: {str(e)}")
             return None
@@ -418,6 +452,10 @@ class Event(BaseModel):
     def update(cls, event_id, name, time, location, uniform_required):
         """更新活动信息"""
         try:
+            # 前端传来的时间已经是北京时间，直接存储（移除时区信息）
+            if hasattr(time, 'replace') and time.tzinfo:
+                time = time.replace(tzinfo=None)
+            
             db.execute_update(
                 EVENT_QUERIES['update'],
                 (name, time, location, uniform_required, event_id)
@@ -440,10 +478,11 @@ class Event(BaseModel):
     def list_all(cls):
         """列出所有活动"""
         try:
-            events = db.execute_query(EVENT_QUERIES['list_all'])
+            raw_events = db.execute_query(EVENT_QUERIES['list_all'])
+            events = [cls.format_dict(event) for event in raw_events] if raw_events else []
             # 为每个活动获取关联的训练
             for event in events:
-                event['trainings'] = EventTraining.list_by_event(event['event_id'])
+                event['trainings'] = EventTraining.list_by_event(event.get('event_id'))
             return events
         except Exception as e:
             logger.error(f"获取活动列表失败: {str(e)}")
@@ -453,10 +492,11 @@ class Event(BaseModel):
     def list_upcoming(cls):
         """列出即将开始的活动"""
         try:
-            events = db.execute_query(EVENT_QUERIES['list_upcoming'])
+            raw_events = db.execute_query(EVENT_QUERIES['list_upcoming'])
+            events = [cls.format_dict(event) for event in raw_events] if raw_events else []
             # 为每个活动获取关联的训练
             for event in events:
-                event['trainings'] = EventTraining.list_by_event(event['event_id'])
+                event['trainings'] = EventTraining.list_by_event(event.get('event_id'))
             return events
         except Exception as e:
             logger.error(f"获取即将开始的活动失败: {str(e)}")
@@ -464,7 +504,7 @@ class Event(BaseModel):
     
     @classmethod
     def status(cls, event):
-        """获取活动状态"""
+        """获取活动状态（基于北京时间）"""
         if not event:
             return '未知'
         
@@ -472,11 +512,11 @@ class Event(BaseModel):
         if not event_time:
             return '未知'
             
-        if isinstance(event_time, str):
-            event_time = datetime.fromisoformat(event_time.replace('Z', '+00:00'))
-            
-        # 使用UTC时间进行比较，确保一致的时区处理
-        return '未开始' if event_time > datetime.utcnow() else '已开始'
+        # 转换为北京时间进行比较
+        event_beijing_time = TimeUtils.to_beijing_time(event_time)
+        current_beijing_time = TimeUtils.now_beijing()
+        
+        return '未开始' if event_beijing_time > current_beijing_time else '已开始'
     
     @classmethod
     def to_dict(cls, event):
@@ -838,11 +878,12 @@ class PointHistory(BaseModel):
     def get_by_id(cls, history_id):
         """根据ID获取积分历史记录"""
         try:
-            return db.execute_query(
+            raw_data = db.execute_query(
                 POINT_HISTORY_QUERIES['get_by_id'], 
                 (history_id,), 
                 fetch_one=True
             )
+            return cls.format_dict(raw_data) if raw_data else None
         except Exception as e:
             logger.error(f"获取积分历史记录失败: {str(e)}")
             return None
@@ -851,16 +892,23 @@ class PointHistory(BaseModel):
     def list_by_user(cls, user_id):
         """列出用户的所有积分历史记录"""
         try:
-            return db.execute_query(POINT_HISTORY_QUERIES['list_by_user'], (user_id,))
+            logger.info(f"获取用户 {user_id} 的积分历史记录")
+            raw_data = db.execute_query(POINT_HISTORY_QUERIES['list_by_user'], (user_id,))
+            if raw_data is None:
+                logger.warning(f"用户 {user_id} 的积分历史查询返回None")
+                return []
+            logger.info(f"用户 {user_id} 的积分历史记录数量: {len(raw_data)}")
+            return [cls.format_dict(item) for item in raw_data]
         except Exception as e:
-            logger.error(f"获取用户积分历史记录失败: {str(e)}")
+            logger.error(f"获取用户积分历史记录失败: {str(e)}", exc_info=True)
             return []
     
     @classmethod
     def list_all(cls):
         """列出所有积分历史记录"""
         try:
-            return db.execute_query(POINT_HISTORY_QUERIES['list_all'])
+            raw_data = db.execute_query(POINT_HISTORY_QUERIES['list_all'])
+            return [cls.format_dict(item) for item in raw_data] if raw_data else []
         except Exception as e:
             logger.error(f"获取所有积分历史记录失败: {str(e)}")
             return []

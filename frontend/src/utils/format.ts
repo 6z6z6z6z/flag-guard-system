@@ -4,26 +4,32 @@ import utc from 'dayjs/plugin/utc'
 dayjs.extend(utc)
 
 /**
- * 格式化日期时间，精确到秒，并进行UTC到CST (+8) 的转换
- * @param dateTime 日期时间字符串 (应为UTC时间)
+ * 格式化日期时间，精确到秒
+ * @param dateTime 日期时间字符串
  * @returns 格式化后的日期时间字符串
  */
 export const formatDateTime = (dateTime: string | null | undefined): string => {
   if (!dateTime) return 'N/A'
   
-  // 假设输入是UTC时间，转换为本地时间(东八区)并格式化
-  const formattedTime = dayjs.utc(dateTime).local().format('YYYY-MM-DD HH:mm:ss')
-  
-  if (formattedTime === 'Invalid Date') {
-    // 如果dayjs解析失败，尝试使用原生Date对象作为后备
-    const date = new Date(dateTime)
-    if (isNaN(date.getTime())) {
+  try {
+    let parsedTime = dayjs(dateTime);
+    
+    // 检查是否包含时区信息（+08:00），如果有则减去8小时的重复偏移
+    if (typeof dateTime === 'string' && dateTime.includes('+08:00')) {
+      // 如果包含+08:00，说明已经是北京时间的ISO格式，减去8小时的重复偏移
+      parsedTime = parsedTime.subtract(8, 'hour');
+    }
+    
+    const formattedTime = parsedTime.format('YYYY-MM-DD HH:mm:ss');
+    
+    if (formattedTime === 'Invalid Date') {
+      console.warn('Invalid date format:', dateTime)
       return 'Invalid Date'
     }
-    // 手动进行UTC+8的转换
-    date.setHours(date.getHours() + 8)
-    return date.toISOString().slice(0, 19).replace('T', ' ')
-  }
 
-  return formattedTime
+    return formattedTime
+  } catch (error) {
+    console.error('Date formatting error:', dateTime, error)
+    return 'Date Error'
+  }
 } 

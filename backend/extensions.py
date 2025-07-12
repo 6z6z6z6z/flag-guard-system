@@ -28,7 +28,7 @@ def init_extensions(app):
             return None
         from models_pymysql import User
         user = User.get_by_id(int(identity))
-        app.logger.debug(f"Found user: {user['username'] if user else None}")
+        app.logger.debug(f"Found user: {user.get('username') if user else None}")
         return user
 
     @jwt.expired_token_loader

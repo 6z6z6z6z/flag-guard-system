@@ -6,6 +6,7 @@ from utils.route_utils import (
     APIResponse, validate_required_fields, handle_exceptions,
     validate_json_request, role_required
 )
+from utils.time_utils import TimeUtils
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 bp = Blueprint('trainings', __name__)
@@ -23,21 +24,19 @@ def get_trainings_for_review():
     # 获取所有训练
     all_trainings = Training.list_all()
     
-    now = datetime.utcnow()
+    current_beijing_time = TimeUtils.now_beijing()
     
     # 过滤训练
     filtered_trainings = []
     for training in all_trainings:
-        training_time = training.get('end_time')
-        if isinstance(training_time, str):
-            training_time = datetime.fromisoformat(training_time.replace('Z', '+00:00'))
+        training_end_time = TimeUtils.from_db_to_beijing(training.get('end_time'))
         
         # 获取该训练的所有报名
         registrations = TrainingRegistration.list_by_training(training.get('training_id'))
         awarded_status = any(r.get('status') == 'awarded' for r in registrations)
         
         if status == 'pending':
-            if training_time < now and not awarded_status:
+            if training_end_time and training_end_time < current_beijing_time and not awarded_status:
                 filtered_trainings.append(training)
         elif status == 'reviewed':
             if awarded_status:
@@ -47,7 +46,7 @@ def get_trainings_for_review():
     
     # 按开始时间降序排序
     filtered_trainings.sort(
-        key=lambda x: x.get('start_time') if isinstance(x.get('start_time'), datetime) else datetime.fromisoformat(x.get('start_time').replace('Z', '+00:00')), 
+        key=lambda x: TimeUtils.from_db_to_beijing(x.get('start_time')) or TimeUtils.now_beijing(), 
         reverse=True
     )
     
@@ -201,29 +200,27 @@ def get_training_options():
     """获取训练选项列表"""
     # 获取所有训练
     all_trainings = Training.list_all()
-    now = datetime.utcnow()
+    current_beijing_time = TimeUtils.now_beijing()
     
     # 过滤未来的训练
     future_trainings = []
     for training in all_trainings:
-        end_time = training.get('end_time')
-        if isinstance(end_time, str):
-            end_time = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+        end_time = TimeUtils.from_db_to_beijing(training.get('end_time'))
         
-        if end_time > now:
+        if end_time and end_time > current_beijing_time:
             future_trainings.append(training)
     
     # 按开始时间升序排序
     future_trainings.sort(
-        key=lambda x: x.get('start_time') if isinstance(x.get('start_time'), datetime) else datetime.fromisoformat(x.get('start_time').replace('Z', '+00:00'))
+        key=lambda x: TimeUtils.from_db_to_beijing(x.get('start_time')) or TimeUtils.now_beijing()
     )
     
     # 格式化输出
     return APIResponse.success(data=[{
         'training_id': t.get('training_id'),
         'name': t.get('name'),
-        'start_time': t.get('start_time').isoformat() if isinstance(t.get('start_time'), datetime) else t.get('start_time'),
-        'end_time': t.get('end_time').isoformat() if isinstance(t.get('end_time'), datetime) and t.get('end_time') else None
+        'start_time': TimeUtils.format_for_frontend_iso(t.get('start_time')),
+        'end_time': TimeUtils.format_for_frontend_iso(t.get('end_time'))
     } for t in future_trainings])
 
 @bp.route('/<int:training_id>/register', methods=['POST'])
@@ -235,11 +232,11 @@ def register_training(training_id):
     if not training:
         return APIResponse.error('训练不存在', 404)
     
-    end_time = training.get('end_time')
-    if isinstance(end_time, str):
-        end_time = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+    # 从数据库读取的时间是UTC时间，需要先转换为北京时间
+    end_time = TimeUtils.from_db_to_beijing(training.get('end_time'))
+    current_beijing_time = TimeUtils.now_beijing()
     
-    if end_time and end_time < datetime.utcnow():
+    if end_time and end_time < current_beijing_time:
         return APIResponse.error('训练已结束', 400)
     
     user_id = int(get_jwt_identity())
@@ -274,11 +271,10 @@ def cancel_registration(training_id):
         
     current_app.logger.info(f'找到训练: {training.get("name")}')
     
-    end_time = training.get('end_time')
-    if isinstance(end_time, str):
-        end_time = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+    end_time = TimeUtils.from_db_to_beijing(training.get('end_time'))
+    current_beijing_time = TimeUtils.now_beijing()
     
-    if end_time and end_time < datetime.utcnow():
+    if end_time and end_time < current_beijing_time:
         current_app.logger.warning(f'训练 {training_id} 已结束')
         return APIResponse.error('训练已结束', 400)
     
@@ -325,14 +321,8 @@ def get_trainings():
     per_page = request.args.get('per_page', 10, type=int)
     current_user_id = int(get_jwt_identity())
     
-    # 获取所有训练
+    # 获取所有训练 (已在数据库层面按start_time降序排序)
     all_trainings = Training.list_all()
-    
-    # 按开始时间降序排序
-    all_trainings.sort(
-        key=lambda x: x.get('start_time') if isinstance(x.get('start_time'), datetime) else datetime.fromisoformat(x.get('start_time').replace('Z', '+00:00')),
-        reverse=True
-    )
     
     # 分页
     total = len(all_trainings)
@@ -379,8 +369,12 @@ def create_training():
         return APIResponse.error(error_msg, 400)
     
     try:
-        start_time = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
-        end_time = datetime.fromisoformat(data['end_time'].replace('Z', '+00:00'))
+        # 解析前端传来的北京时间
+        start_time = TimeUtils.parse_frontend_time(data['start_time'])
+        end_time = TimeUtils.parse_frontend_time(data['end_time'])
+        
+        if not start_time or not end_time:
+            return APIResponse.error('时间格式无效', 400)
         
         if start_time >= end_time:
             return APIResponse.error('开始时间必须早于结束时间', 400)
@@ -425,8 +419,12 @@ def update_training(training_id):
         return APIResponse.error(error_msg, 400)
     
     try:
-        start_time = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
-        end_time = datetime.fromisoformat(data['end_time'].replace('Z', '+00:00'))
+        # 解析前端传来的北京时间
+        start_time = TimeUtils.parse_frontend_time(data['start_time'])
+        end_time = TimeUtils.parse_frontend_time(data['end_time'])
+        
+        if not start_time or not end_time:
+            return APIResponse.error('时间格式无效', 400)
         
         if start_time >= end_time:
             return APIResponse.error('开始时间必须早于结束时间', 400)
@@ -664,4 +662,4 @@ def confirm_registration(registration_id):
         return APIResponse.success(msg='确认报名成功')
     except Exception as e:
         current_app.logger.error(f'确认报名失败: {str(e)}')
-        return APIResponse.error('确认报名失败', 500) 
+        return APIResponse.error('确认报名失败', 500)
