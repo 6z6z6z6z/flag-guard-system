@@ -17,7 +17,11 @@ Flag Guard System是一个用于管理旗队的系统，支持以下功能：
 - Flask 框架
 - PyMySQL 数据库连接
 - MySQL 数据库
-- JWT 认证
+- JWT 认证 (Flask-JWT-Extended)
+- Swagger API 文档 (Flasgger)
+- CORS 支持 (Flask-CORS)
+- 代码质量工具 (Black, Flake8)
+- 测试框架 (pytest)
 
 ## 数据库迁移说明
 
@@ -41,15 +45,25 @@ Flag Guard System是一个用于管理旗队的系统，支持以下功能：
 - `routes/` - 路由模块
   - `auth.py` - 认证路由
   - `users.py` - 用户路由
+  - `users_delete.py` - 用户删除路由
   - `trainings.py` - 训练路由
   - `events.py` - 活动路由
   - `flag.py` - 升降旗路由
   - `points.py` - 积分路由
+  - `dashboard.py` - 仪表盘路由
   - `file.py` - 文件路由
 - `utils/` - 工具函数
+  - `auth.py` - 认证工具
+  - `export.py` - 数据导出工具
+  - `pagination.py` - 分页工具
+  - `route_utils.py` - 路由工具
+  - `time_utils.py` - 时间工具
+  - `upload.py` - 文件上传工具
 - `middleware/` - 中间件
+  - `logging.py` - 日志中间件
 - `uploads/` - 上传文件存储目录
 - `instance/` - 实例配置和数据
+  - `logs/` - 日志文件目录
 
 ## 运行方法
 
@@ -84,19 +98,19 @@ MYSQL_PORT=3306
 4. 初始化数据库：
 
 ```bash
-flask init-db
+flask --app app.py init-db
 ```
 
 5. 创建管理员用户：
 
 ```bash
-flask create-user -u admin -p password -r superadmin -n Admin -s ADMIN001 -c College
+flask --app app.py create-user <用户名> <密码> <姓名> <学号> --role superadmin
 ```
 
 6. 运行应用：
 
 ```bash
-flask run
+python app.py
 ```
 
 ## API文档
@@ -105,48 +119,42 @@ flask run
 
 ## 命令行工具
 
-- `flask init-db` - 初始化数据库
-- `flask drop-db` - 删除数据库(谨慎使用)
-- `flask create-user` - 创建用户
-- `flask delete-user` - 删除用户
-- `flask list-users` - 列出所有用户
-- `flask cleanup-records` - 清理过期记录
-- `flask backup-db` - 备份数据库
-- `flask check-system` - 检查系统状态
-- `flask reset-password` - 重置用户密码
+- `flask --app app.py init-db` - 初始化数据库
+- `flask --app app.py drop-db --yes` - 删除数据库(谨慎使用)
+- `flask --app app.py create-user <用户名> <密码> <姓名> <学号> --role <角色>` - 创建用户
+- `flask --app app.py delete-user <用户名>` - 删除用户
+- `flask --app app.py list-users` - 列出所有用户
+- `flask --app app.py cleanup-records --days <天数>` - 清理过期记录
+- `flask --app app.py backup-db <备份文件名>` - 备份数据库
+- `flask --app app.py check-system` - 检查系统状态
+- `flask --app app.py reset-password <用户名> <新密码>` - 重置用户密码
+- `flask --app app.py export-data <输出文件>` - 导出数据
 
-## 项目说明
+## 开发说明
 
-1. 项目结构
+### 代码质量
 - 使用 Black 格式化代码
-- 使用 Flake8 检查代码
+- 使用 Flake8 检查代码规范
+- 使用 pytest 进行单元测试
 
-2. 测试
+### 测试
 ```bash
 pytest
+pytest --cov  # 运行测试并生成覆盖率报告
 ```
 
-3. 数据库迁移
-```bash
-flask db migrate -m "migration message"
-flask db upgrade
-```
-
-4. 项目说明
-- 修改 `.env` 文件中的配置
-- 设置 `FLASK_ENV=production`
-- 备份数据库
-- 确保所有敏感信息加密
-
-5. 使用 Gunicorn 部署
+### 部署
+生产环境推荐使用 Gunicorn 部署：
 ```bash
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
-6. 贡献项目
-- Fork 项目
-- 提供支持
-- 提交 Pull Request
+### 环境配置
+- 开发环境：设置 `DEBUG=True`
+- 生产环境：设置 `DEBUG=False`，配置安全的 SECRET_KEY
+- 数据库：确保 MySQL 服务正常运行
+- 日志：应用日志存储在 `instance/logs/` 目录
 
-7. 项目验证
+## 许可证
+
 MIT License 
