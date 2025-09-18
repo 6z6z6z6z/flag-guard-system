@@ -1,6 +1,6 @@
 <template>
-  <el-container class="layout-container" :class="{ 'is-mobile': isMobile }">
-    <el-aside :width="isCollapse ? '64px' : '220px'" :class="{ 'mobile-open': isMobile && mobileMenuOpen }">
+  <el-container class="layout-container" :class="{ 'is-mobile': isCompact }">
+    <el-aside :width="isCollapse ? '64px' : '220px'" :class="{ 'mobile-open': isCompact && mobileMenuOpen }">
       <div class="logo">
         <img src="/logo.png" alt="系统Logo" />
         <transition name="logo-fade">
@@ -13,7 +13,7 @@
       <el-menu
         :default-active="$route.path"
         class="el-menu-vertical"
-        :collapse="isMobile ? false : isCollapse"
+  :collapse="isCompact ? false : isCollapse"
         router
       >
         <el-menu-item index="/dashboard" v-if="isAdmin">
@@ -54,7 +54,7 @@
       <el-header>
         <div class="header-left">
           <el-icon class="collapse-icon" @click="toggleMenu">
-            <component :is="(isMobile ? !mobileMenuOpen : !isCollapse) ? 'Expand' : 'Fold'" />
+            <component :is="(isCompact ? !mobileMenuOpen : !isCollapse) ? 'Expand' : 'Fold'" />
           </el-icon>
           <el-breadcrumb separator="/">
             <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path" :to="item.path ? { path: item.path } : undefined">
@@ -81,7 +81,7 @@
       </el-main>
     </el-container>
     <!-- 移动端抽屉遮罩层 -->
-    <div v-if="isMobile && mobileMenuOpen" class="mobile-mask" @click="mobileMenuOpen = false"></div>
+  <div v-if="isCompact && mobileMenuOpen" class="mobile-mask" @click="mobileMenuOpen = false"></div>
   </el-container>
 </template>
 
@@ -106,7 +106,8 @@ const route = useRoute()
 const userStore = useUserStore()
 const isCollapse = ref(false)
 const breadcrumbs = ref<RouteLocationMatched[]>([])
-const isMobile = ref(false)
+// 紧凑模式（手机+平板）：宽度 < 1024 时视为紧凑，侧边栏使用抽屉行为
+const isCompact = ref(false)
 const mobileMenuOpen = ref(false)
 
 const getBreadcrumbs = () => {
@@ -129,10 +130,9 @@ let handleResize: (() => void) | null = null
 onMounted(() => {
   getBreadcrumbs()
   handleResize = () => {
-    isMobile.value = window.innerWidth < 768
-    if (isMobile.value) {
-      isCollapse.value = true
-    }
+    isCompact.value = window.innerWidth < 1024
+    // 紧凑模式下，侧边栏使用抽屉，折叠状态无意义，但为避免布局抖动，保持折叠为 true
+    if (isCompact.value) isCollapse.value = true
   }
   handleResize()
   window.addEventListener('resize', handleResize)
@@ -155,9 +155,9 @@ const handleCommand = (command: string) => {
   }
 }
 
-// 菜单在移动端与桌面端的切换逻辑
+// 菜单在紧凑与桌面端的切换逻辑
 const toggleMenu = () => {
-  if (isMobile.value) {
+  if (isCompact.value) {
     mobileMenuOpen.value = !mobileMenuOpen.value
   } else {
     isCollapse.value = !isCollapse.value
@@ -166,7 +166,7 @@ const toggleMenu = () => {
 
 // 路由变更时，如果在移动端则自动关闭抽屉
 watch(() => route.path, () => {
-  if (isMobile.value) mobileMenuOpen.value = false
+  if (isCompact.value) mobileMenuOpen.value = false
 })
 </script>
 
@@ -337,8 +337,8 @@ watch(() => route.path, () => {
   transition-delay: 0s;
 }
 
-/* 移动端适配 */
-@media (max-width: 768px) {
+/* 移动端适配（手机，<768px）*/
+@media (max-width: 767px) {
   .el-header {
     padding: 0 12px;
   }
@@ -354,7 +354,10 @@ watch(() => route.path, () => {
   .collapse-icon {
     margin-right: 8px;
   }
-  /* 侧边栏改为抽屉 */
+}
+
+/* 平板/紧凑适配（<1024px）：侧边栏使用抽屉展开/收起 */
+@media (max-width: 1023px) {
   .el-aside {
     position: fixed;
     left: 0;

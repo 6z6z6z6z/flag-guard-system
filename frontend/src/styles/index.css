@@ -215,4 +215,49 @@ textarea {
     padding-top: 6vh; /* 约等于略微下移若干像素，随屏高自适应 */
     box-sizing: border-box;
   }
+
+  /* —— 分页组件（Pagination）移动端适配 —— */
+  .el-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  /* 页码按钮更紧凑 */
+  .el-pagination .el-pager li {
+    min-width: 28px;
+    height: 28px;
+    line-height: 28px;
+    margin: 0 2px;
+  }
+  /* 上一页/下一页按钮压缩 */
+  .el-pagination .btn-prev,
+  .el-pagination .btn-next {
+    min-width: 32px;
+    height: 28px;
+  }
+  /* total、sizes、jumper 等分组允许换行显示 */
+  .el-pagination__total,
+  .el-pagination__sizes,
+  .el-pagination__jump {
+    flex: 1 1 100%;
+    text-align: center;
+    margin-top: 2px;
+  }
+  /* sizes 下拉框宽度自适应，避免撑出 */
+  .el-pagination__sizes .el-select,
+  .el-pagination__jump .el-input {
+    width: auto;
+    min-width: 100px;
+  }
+
+  /* 分页跳转段落（最后一个）居中显示并独占一行 */
+  .el-pagination__jump.is-last {
+    flex: 1 1 100%;
+    text-align: center;
+    justify-content: center;
+  }
 }

@@ -51,7 +51,7 @@
 
     <!-- 待审核记录和最近活动 -->
     <el-row :gutter="20" class="mt-20">
-      <el-col :span="12">
+      <el-col :span="24">
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
@@ -73,7 +73,7 @@
           </el-table>
         </el-card>
       </el-col>
-      <el-col :span="12">
+      <el-col :span="24">
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
