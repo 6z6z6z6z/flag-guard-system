@@ -1,6 +1,6 @@
 <template>
-  <el-container class="layout-container">
-    <el-aside :width="isCollapse ? '64px' : '220px'">
+  <el-container class="layout-container" :class="{ 'is-mobile': isMobile }">
+    <el-aside :width="isCollapse ? '64px' : '220px'" :class="{ 'mobile-open': isMobile && mobileMenuOpen }">
       <div class="logo">
         <img src="/logo.png" alt="系统Logo" />
         <transition name="logo-fade">
@@ -13,7 +13,7 @@
       <el-menu
         :default-active="$route.path"
         class="el-menu-vertical"
-        :collapse="isCollapse"
+        :collapse="isMobile ? false : isCollapse"
         router
       >
         <el-menu-item index="/dashboard" v-if="isAdmin">
@@ -53,8 +53,8 @@
     <el-container>
       <el-header>
         <div class="header-left">
-          <el-icon class="collapse-icon" @click="isCollapse = !isCollapse">
-            <component :is="isCollapse ? 'Expand' : 'Fold'" />
+          <el-icon class="collapse-icon" @click="toggleMenu">
+            <component :is="(isMobile ? !mobileMenuOpen : !isCollapse) ? 'Expand' : 'Fold'" />
           </el-icon>
           <el-breadcrumb separator="/">
             <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path" :to="item.path ? { path: item.path } : undefined">
@@ -80,11 +80,13 @@
         <router-view />
       </el-main>
     </el-container>
+    <!-- 移动端抽屉遮罩层 -->
+    <div v-if="isMobile && mobileMenuOpen" class="mobile-mask" @click="mobileMenuOpen = false"></div>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute, RouteLocationMatched } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import {
@@ -104,6 +106,8 @@ const route = useRoute()
 const userStore = useUserStore()
 const isCollapse = ref(false)
 const breadcrumbs = ref<RouteLocationMatched[]>([])
+const isMobile = ref(false)
+const mobileMenuOpen = ref(false)
 
 const getBreadcrumbs = () => {
   const staticItem = { path: '', meta: { title: '国旗护卫队管理系统' } } as RouteLocationMatched
@@ -120,8 +124,22 @@ watch(
   }
 )
 
+let handleResize: (() => void) | null = null
+
 onMounted(() => {
   getBreadcrumbs()
+  handleResize = () => {
+    isMobile.value = window.innerWidth < 768
+    if (isMobile.value) {
+      isCollapse.value = true
+    }
+  }
+  handleResize()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  if (handleResize) window.removeEventListener('resize', handleResize)
 })
 
 // 计算属性：判断是否为管理员或超级管理员
@@ -136,6 +154,20 @@ const handleCommand = (command: string) => {
     router.push('/login')
   }
 }
+
+// 菜单在移动端与桌面端的切换逻辑
+const toggleMenu = () => {
+  if (isMobile.value) {
+    mobileMenuOpen.value = !mobileMenuOpen.value
+  } else {
+    isCollapse.value = !isCollapse.value
+  }
+}
+
+// 路由变更时，如果在移动端则自动关闭抽屉
+watch(() => route.path, () => {
+  if (isMobile.value) mobileMenuOpen.value = false
+})
 </script>
 
 <style scoped>
@@ -303,5 +335,48 @@ const handleCommand = (command: string) => {
   opacity: 0;
   transform: translateX(-10px);
   transition-delay: 0s;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .el-header {
+    padding: 0 12px;
+  }
+  .el-main {
+    padding: 12px;
+  }
+  .logo-text {
+    display: none;
+  }
+  .el-breadcrumb {
+    display: none;
+  }
+  .collapse-icon {
+    margin-right: 8px;
+  }
+  /* 侧边栏改为抽屉 */
+  .el-aside {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 2000;
+    width: 220px !important;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    background-color: #f7f8fa;
+  }
+  .el-aside.mobile-open {
+    transform: translateX(0);
+  }
+  .mobile-mask {
+    position: fixed;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 1999;
+  }
 }
 </style> 

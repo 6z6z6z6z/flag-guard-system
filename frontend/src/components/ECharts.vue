@@ -23,6 +23,7 @@ const props = defineProps({
 
 const chartRef = ref<HTMLDivElement | null>(null)
 let chartInstance: echarts.ECharts | null = null
+let resizeObserver: ResizeObserver | null = null
 
 const initChart = () => {
   if (chartRef.value) {
@@ -37,12 +38,20 @@ const resizeChart = () => {
 
 onMounted(() => {
   initChart()
+  // 监听窗口与容器尺寸变化，提升移动端自适应体验
   window.addEventListener('resize', resizeChart)
+  if (chartRef.value && 'ResizeObserver' in window) {
+    resizeObserver = new ResizeObserver(() => resizeChart())
+    resizeObserver.observe(chartRef.value)
+  }
 })
 
 onUnmounted(() => {
   chartInstance?.dispose()
   window.removeEventListener('resize', resizeChart)
+  if (resizeObserver && chartRef.value) {
+    resizeObserver.unobserve(chartRef.value)
+  }
 })
 
 watch(

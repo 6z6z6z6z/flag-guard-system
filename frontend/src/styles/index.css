@@ -135,3 +135,84 @@ textarea {
     transform: translateX(-100%);
   }
 }
+
+/* =====================
+   响应式全局样式（移动端）
+   ===================== */
+@media (max-width: 768px) {
+  html, body {
+    font-size: 14px;
+  }
+
+  /* 页面容器通用内边距缩小 */
+  .page-container,
+  .users-container,
+  .dashboard-container,
+  .events-container,
+  .trainings-container {
+    padding: 12px !important;
+  }
+
+  /* 表格容器允许横向滚动，避免列拥挤 */
+  .el-table {
+    font-size: 12px;
+  }
+  .el-table__body-wrapper,
+  .el-table__header-wrapper {
+    overflow-x: auto;
+  }
+  .el-table .cell {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  /* 表单控件更易点按 */
+  .el-input__inner,
+  .el-select .el-input__inner,
+  .el-button {
+    min-height: 36px;
+  }
+
+  /* 面包屑、非关键装饰在小屏可隐藏，由各页自行决定显示 */
+  .breadcrumb-optional {
+    display: none !important;
+  }
+
+  /* —— 对话框（Dialog）在小屏限制宽度，避免超出视口 —— */
+  .el-overlay .el-dialog {
+    /* 如果业务里通过 width 属性设置了固定像素，这里强制改为不超过视口 */
+    width: min(92vw, 640px) !important;
+    max-width: 92vw;
+    margin: 0 auto; /* 居中 */
+    box-sizing: border-box;
+  }
+
+  /* 对话框内容区：限制最大高度，超出滚动，避免整体溢出屏幕高度 */
+  .el-overlay .el-dialog__body {
+    max-height: calc(100vh - 180px);
+    overflow: auto;
+  }
+
+  /* 对话框底部按钮区域：小屏下允许换行并保持间距 */
+  .el-overlay .el-dialog__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  /* —— MessageBox 同步限制 —— */
+  .el-message-box {
+    width: min(92vw, 560px) !important;
+    max-width: 92vw;
+    box-sizing: border-box;
+  }
+
+  /* 让对话框整体略微向下（避免贴顶） */
+  .el-overlay .el-overlay-dialog {
+    /* Element Plus 默认是 align-items:center；这里在小屏改为顶部对齐，并加顶部留白 */
+    align-items: flex-start;
+    padding-top: 6vh; /* 约等于略微下移若干像素，随屏高自适应 */
+    box-sizing: border-box;
+  }
+}

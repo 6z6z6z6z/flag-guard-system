@@ -472,4 +472,32 @@ const clearSearch = (showMessage = true) => {
     }
   }
 }
+
+@media (max-width: 768px) {
+  .users-container {
+    padding: 12px;
+  }
+  .header-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .page-title {
+    font-size: 18px;
+  }
+  .search-area {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .search-area .el-input {
+    flex: 1;
+  }
+  .pagination {
+    justify-content: center;
+  }
+  :deep(.el-table__body-wrapper),
+  :deep(.el-table__header-wrapper) {
+    overflow-x: auto;
+  }
+}
 </style>
