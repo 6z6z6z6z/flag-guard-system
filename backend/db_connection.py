@@ -4,93 +4,87 @@ import os
 import logging
 from dotenv import load_dotenv
 from flask import current_app
+from dbutils.pooled_db import PooledDB
 
 load_dotenv()
 
-# 配置日志
 logger = logging.getLogger(__name__)
 
 class Database:
-    """数据库连接管理类"""
+    """数据库连接池管理类"""
     _instance = None
-    
+    _pool = None
+
     @classmethod
     def get_instance(cls):
-        """单例模式获取数据库连接实例"""
+        """单例模式获取数据库管理实例"""
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-        
+
     def __init__(self):
-        """初始化数据库连接配置"""
-        self.connection = None
-        
-    def connect(self):
-        """创建数据库连接"""
-        try:
-            if self.connection is None or not self.connection.open:
-                # 从Flask配置中读取数据库配置
-                if current_app:
-                    self.host = current_app.config['MYSQL_HOST']
-                    self.user = current_app.config['MYSQL_USER']
-                    self.password = current_app.config['MYSQL_PASSWORD']
-                    self.db = current_app.config['MYSQL_DATABASE']
-                    self.port = current_app.config['MYSQL_PORT']
-                    self.charset = current_app.config['MYSQL_CHARSET']
-                else:
-                    # 如果没有Flask上下文，从环境变量读取
-                    self.host = os.environ.get('MYSQL_HOST', 'localhost')
-                    self.user = os.environ.get('MYSQL_USER', 'root')
-                    self.password = os.environ.get('MYSQL_PASSWORD', '123456')
-                    self.db = os.environ.get('MYSQL_DATABASE', 'system')
-                    self.port = int(os.environ.get('MYSQL_PORT', 3306))
-                    self.charset = os.environ.get('MYSQL_CHARSET', 'utf8mb4')
-                
-                self.connection = pymysql.connect(
-                    host=self.host,
-                    user=self.user,
-                    password=self.password,
-                    database=self.db,
-                    port=self.port,
-                    charset=self.charset,
-                    cursorclass=pymysql.cursors.DictCursor
-                )
-                logger.info(f"Database connection established to {self.host}:{self.port}/{self.db}")
-            return self.connection
-        except Exception as e:
-            logger.error(f"Error connecting to database: {str(e)}")
-            raise
-            
+        if Database._pool is None:
+            # 从 Flask 配置或环境变量读取
+            if current_app:
+                host = current_app.config['MYSQL_HOST']
+                user = current_app.config['MYSQL_USER']
+                password = current_app.config['MYSQL_PASSWORD']
+                db = current_app.config['MYSQL_DATABASE']
+                port = current_app.config['MYSQL_PORT']
+                charset = current_app.config['MYSQL_CHARSET']
+            else:
+                # 如果没有Flask上下文，从环境变量读取
+                host = os.environ.get('MYSQL_HOST', 'localhost')
+                user = os.environ.get('MYSQL_USER', 'root')
+                password = os.environ.get('MYSQL_PASSWORD', '123456')
+                db = os.environ.get('MYSQL_DATABASE', 'system')
+                port = int(os.environ.get('MYSQL_PORT', 3306))
+                charset = os.environ.get('MYSQL_CHARSET', 'utf8mb4')
+
+            Database._pool = PooledDB(
+                creator=pymysql,
+                maxconnections=10,  # 最大连接数
+                mincached=2,        # 初始化时创建的空闲连接
+                maxcached=5,        # 最大空闲连接数
+                blocking=True,      # 连接数不足时是否等待
+                ping=7,             # 检查连接是否可用 (0-7)
+                host=host,
+                user=user,
+                password=password,
+                database=db,
+                port=port,
+                charset=charset,
+                cursorclass=pymysql.cursors.DictCursor
+            )
+            logger.info(f"Database connection pool initialized for {host}:{port}/{db}")
+
     def get_connection(self):
-        """获取数据库连接"""
-        return self.connect()
-    
+        """从连接池获取连接"""
+        return Database._pool.connection()
+
     def execute_query(self, query, params=None, fetch_one=False):
         """执行查询并获取结果"""
-        conn = self.connect()
-        cursor = None
+        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            cursor.execute(query, params or ())
-            if fetch_one:
-                return cursor.fetchone()
-            return cursor.fetchall()
+            with conn.cursor() as cursor:
+                cursor.execute(query, params or ())
+                if fetch_one:
+                    return cursor.fetchone()
+                return cursor.fetchall()
         except Exception as e:
             logger.error(f"Error executing query: {str(e)}")
             logger.error(f"Query: {query}")
             logger.error(f"Params: {params}")
             raise
         finally:
-            if cursor:
-                cursor.close()
-    
+            conn.close()  # 归还连接给连接池
+
     def execute_update(self, query, params=None):
         """执行更新操作并返回受影响的行数"""
-        conn = self.connect()
-        cursor = None
+        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            result = cursor.execute(query, params or ())
+            with conn.cursor() as cursor:
+                result = cursor.execute(query, params or ())
             conn.commit()
             return result
         except Exception as e:
@@ -100,16 +94,14 @@ class Database:
             logger.error(f"Params: {params}")
             raise
         finally:
-            if cursor:
-                cursor.close()
-                
+            conn.close()
+
     def execute_many(self, query, params_list):
         """批量执行SQL操作"""
-        conn = self.connect()
-        cursor = None
+        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            result = cursor.executemany(query, params_list)
+            with conn.cursor() as cursor:
+                result = cursor.executemany(query, params_list)
             conn.commit()
             return result
         except Exception as e:
@@ -117,17 +109,15 @@ class Database:
             logger.error(f"Error executing batch update: {str(e)}")
             raise
         finally:
-            if cursor:
-                cursor.close()
-    
+            conn.close()
+
     def execute_insert(self, query, params=None):
         """执行插入操作并返回最后插入的ID"""
-        conn = self.connect()
-        cursor = None
+        conn = self.get_connection()
         try:
-            cursor = conn.cursor()
-            cursor.execute(query, params or ())
-            last_id = cursor.lastrowid
+            with conn.cursor() as cursor:
+                cursor.execute(query, params or ())
+                last_id = cursor.lastrowid
             conn.commit()
             return last_id
         except Exception as e:
@@ -137,19 +127,7 @@ class Database:
             logger.error(f"Params: {params}")
             raise
         finally:
-            if cursor:
-                cursor.close()
-    
-    def close(self):
-        """关闭数据库连接"""
-        if self.connection and self.connection.open:
-            self.connection.close()
-            self.connection = None
-            logger.info("Database connection closed")
-            
-    def __del__(self):
-        """析构函数，确保连接关闭"""
-        self.close()
+            conn.close()
 
 # 创建全局数据库实例
-db = Database.get_instance() 
+db = Database.get_instance()
