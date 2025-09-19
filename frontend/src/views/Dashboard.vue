@@ -51,7 +51,7 @@
 
     <!-- 待审核记录和最近活动 -->
     <el-row :gutter="20" class="mt-20">
-      <el-col :span="12">
+      <el-col :span="24">
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
@@ -73,7 +73,7 @@
           </el-table>
         </el-card>
       </el-col>
-      <el-col :span="12">
+      <el-col :span="24">
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
@@ -213,5 +213,25 @@ onMounted(() => {
 .clickable:hover {
   transform: translateY(-5px);
   transition: transform 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 12px;
+  }
+  .stat-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .mt-20 {
+    margin-top: 20px;
+  }
+  :deep(.el-col) {
+    width: 100% !important;
+  }
+  :deep(.el-table__body-wrapper),
+  :deep(.el-table__header-wrapper) {
+    overflow-x: auto;
+  }
 }
 </style> 

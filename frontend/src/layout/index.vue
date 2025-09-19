@@ -1,6 +1,6 @@
 <template>
-  <el-container class="layout-container">
-    <el-aside :width="isCollapse ? '64px' : '220px'">
+  <el-container class="layout-container" :class="{ 'is-mobile': isCompact }">
+    <el-aside :width="isCollapse ? '64px' : '220px'" :class="{ 'mobile-open': isCompact && mobileMenuOpen }">
       <div class="logo">
         <img src="/logo.png" alt="系统Logo" />
         <transition name="logo-fade">
@@ -13,7 +13,7 @@
       <el-menu
         :default-active="$route.path"
         class="el-menu-vertical"
-        :collapse="isCollapse"
+  :collapse="isCompact ? false : isCollapse"
         router
       >
         <el-menu-item index="/dashboard" v-if="isAdmin">
@@ -53,8 +53,8 @@
     <el-container>
       <el-header>
         <div class="header-left">
-          <el-icon class="collapse-icon" @click="isCollapse = !isCollapse">
-            <component :is="isCollapse ? 'Expand' : 'Fold'" />
+          <el-icon class="collapse-icon" @click="toggleMenu">
+            <component :is="(isCompact ? !mobileMenuOpen : !isCollapse) ? 'Expand' : 'Fold'" />
           </el-icon>
           <el-breadcrumb separator="/">
             <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path" :to="item.path ? { path: item.path } : undefined">
@@ -80,11 +80,13 @@
         <router-view />
       </el-main>
     </el-container>
+    <!-- 移动端抽屉遮罩层 -->
+  <div v-if="isCompact && mobileMenuOpen" class="mobile-mask" @click="mobileMenuOpen = false"></div>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute, RouteLocationMatched } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import {
@@ -104,6 +106,9 @@ const route = useRoute()
 const userStore = useUserStore()
 const isCollapse = ref(false)
 const breadcrumbs = ref<RouteLocationMatched[]>([])
+// 紧凑模式（手机+平板）：宽度 < 1024 时视为紧凑，侧边栏使用抽屉行为
+const isCompact = ref(false)
+const mobileMenuOpen = ref(false)
 
 const getBreadcrumbs = () => {
   const staticItem = { path: '', meta: { title: '国旗护卫队管理系统' } } as RouteLocationMatched
@@ -120,8 +125,21 @@ watch(
   }
 )
 
+let handleResize: (() => void) | null = null
+
 onMounted(() => {
   getBreadcrumbs()
+  handleResize = () => {
+    isCompact.value = window.innerWidth < 1024
+    // 紧凑模式下，侧边栏使用抽屉，折叠状态无意义，但为避免布局抖动，保持折叠为 true
+    if (isCompact.value) isCollapse.value = true
+  }
+  handleResize()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  if (handleResize) window.removeEventListener('resize', handleResize)
 })
 
 // 计算属性：判断是否为管理员或超级管理员
@@ -136,6 +154,20 @@ const handleCommand = (command: string) => {
     router.push('/login')
   }
 }
+
+// 菜单在紧凑与桌面端的切换逻辑
+const toggleMenu = () => {
+  if (isCompact.value) {
+    mobileMenuOpen.value = !mobileMenuOpen.value
+  } else {
+    isCollapse.value = !isCollapse.value
+  }
+}
+
+// 路由变更时，如果在移动端则自动关闭抽屉
+watch(() => route.path, () => {
+  if (isCompact.value) mobileMenuOpen.value = false
+})
 </script>
 
 <style scoped>
@@ -303,5 +335,51 @@ const handleCommand = (command: string) => {
   opacity: 0;
   transform: translateX(-10px);
   transition-delay: 0s;
+}
+
+/* 移动端适配（手机，<768px）*/
+@media (max-width: 767px) {
+  .el-header {
+    padding: 0 12px;
+  }
+  .el-main {
+    padding: 12px;
+  }
+  .logo-text {
+    display: none;
+  }
+  .el-breadcrumb {
+    display: none;
+  }
+  .collapse-icon {
+    margin-right: 8px;
+  }
+}
+
+/* 平板/紧凑适配（<1024px）：侧边栏使用抽屉展开/收起 */
+@media (max-width: 1023px) {
+  .el-aside {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 2000;
+    width: 220px !important;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    background-color: #f7f8fa;
+  }
+  .el-aside.mobile-open {
+    transform: translateX(0);
+  }
+  .mobile-mask {
+    position: fixed;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 1999;
+  }
 }
 </style> 

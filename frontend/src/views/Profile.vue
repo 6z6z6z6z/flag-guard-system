@@ -31,29 +31,29 @@
         <el-divider content-position="left">基础信息</el-divider>
         
         <div class="info-section">
-          <el-form label-width="100px" label-position="right">
+          <el-form :label-width="isCompact ? 'auto' : '100px'" :label-position="isCompact ? 'top' : 'right'">
             <el-row :gutter="20">
-              <el-col :span="8">
+              <el-col :xs="12" :sm="12" :md="8">
                 <el-form-item label="用户名">
                   <span class="info-text">{{ userForm.username }}</span>
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
+              <el-col :xs="12" :sm="12" :md="8">
                 <el-form-item label="姓名">
                   <span class="info-text">{{ userForm.name }}</span>
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
+              <el-col :xs="24" :sm="12" :md="8">
                 <el-form-item label="学号">
                   <span class="info-text">{{ userForm.student_id }}</span>
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
+              <el-col :xs="24" :sm="12" :md="8">
                 <el-form-item label="学院">
                   <span class="info-text">{{ userForm.college }}</span>
                 </el-form-item>
               </el-col>
-               <el-col :span="8">
+               <el-col :xs="24" :sm="12" :md="8">
                 <el-form-item label="手机号">
                   <span class="info-text">{{ userForm.phone_number }}</span>
                 </el-form-item>
@@ -69,23 +69,23 @@
             ref="formRef"
             :model="userForm"
             :rules="rules"
-            label-width="100px"
-            label-position="right"
+            :label-width="isCompact ? 'auto' : '100px'"
+            :label-position="isCompact ? 'top' : 'right'"
           >
             <el-row :gutter="20">
-              <el-col :span="8">
+              <el-col :xs="24" :sm="12" :md="8">
                 <el-form-item label="身高(cm)" prop="height">
                   <el-input-number v-if="isEditing" v-model="userForm.height" :min="140" :max="220" :precision="0" controls-position="right" style="width: 100%;"/>
                   <span v-else class="info-text">{{ userForm.height }}</span>
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
+              <el-col :xs="24" :sm="12" :md="8">
                 <el-form-item label="体重(kg)" prop="weight">
                   <el-input-number v-if="isEditing" v-model="userForm.weight" :min="35" :max="150" :precision="1" controls-position="right" style="width: 100%;" />
                   <span v-else class="info-text">{{ userForm.weight }}</span>
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
+              <el-col :xs="24" :sm="12" :md="8">
                 <el-form-item label="鞋码" prop="shoe_size">
                   <el-input-number v-if="isEditing" v-model="userForm.shoe_size" :min="34" :max="48" :precision="0" controls-position="right" style="width: 100%;"/>
                   <span v-else class="info-text">{{ userForm.shoe_size }}</span>
@@ -100,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import request from '../utils/request'
@@ -111,6 +111,8 @@ const formRef = ref<FormInstance>()
 const isEditing = ref(false)
 const isSaving = ref(false)
 const userStore = useUserStore()
+// 紧凑模式：小屏/平板时为 true，用于切换表单布局，防止错位
+const isCompact = ref(false)
 
 const userRole = computed(() => {
   const role = userStore.userInfo?.role
@@ -200,6 +202,15 @@ const handleCancel = () => {
 
 onMounted(() => {
   fetchUserInfo()
+  const resize = () => {
+    isCompact.value = window.innerWidth < 1024
+  }
+  resize()
+  window.addEventListener('resize', resize)
+  // 卸载时移除监听
+  onUnmounted(() => {
+    window.removeEventListener('resize', resize)
+  })
 })
 </script>
 

@@ -143,7 +143,8 @@ const handleLogin = async () => {
   background-size: cover;
   display: flex;
   align-items: center;
-  justify-content: flex-end; /* 让内容靠右 */
+  justify-content: center; /* 居中以适配移动端 */
+  padding: 16px;
 }
 
 .header-container {
@@ -169,20 +170,20 @@ const handleLogin = async () => {
 }
 
 .login-container {
-  width: 300px; 
-  margin-right: 5vw; 
+  width: 100%;
+  max-width: 360px; 
   background: rgba(255, 255, 255, 0.98);
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.1);
-  padding: 30px;
+  padding: 24px;
 }
 
 .login-title {
   text-align: center;
-  margin: 0 0 28px 0; /* 增加标题下边距 */
+  margin: 0 0 20px 0;
   color: #333;
-  font-weight: 600; /* 字体加粗 */
-  font-size: 22px; /* 字体稍大 */
+  font-weight: 600;
+  font-size: 20px;
 }
 
 .register-link {
@@ -210,5 +211,20 @@ const handleLogin = async () => {
 .login-container .el-button:focus {
   background-color: rgb(43, 132, 199); /* A slightly darker shade for hover */
   color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .header-container {
+    top: 16px;
+    left: 16px;
+    gap: 10px;
+  }
+  .header-logo {
+    width: 48px;
+    height: 48px;
+  }
+  .header-title {
+    font-size: 20px;
+  }
 }
 </style> 
